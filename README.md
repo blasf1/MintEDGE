@@ -74,15 +74,16 @@ Test your own efficient resource allocation or energy efficiency strategy by rep
 
 ## References
 
-[1] Blas Gómez, Suzan Bayhan, Estefanía Coronado, José Villalón, Antonio Garrido, "MintEDGE: ,"
+[1] Blas Gómez, Suzan Bayhan, Estefanía Coronado, José Villalón, Antonio Garrido, "MintEDGE: Multi-tier sImulator for eNergy-aware sTrategies in Edge Computing", In Proc. of ACM MobiCom '23, October, 2023. Madrid, Spain. DOI: 10.1145/3570361.3615727. (to appear)
 
 [1] SUMO - Simulation of Urban MObility, [https://www.eclipse.org/sumo/](https://www.eclipse.org/sumo/). Accessed: 24/07/2023.
 
 [2] Philipp Wiesner and Lauritz Thamsen. "[LEAF: Simulating Large Energy-Aware Fog Computing Environments](https://ieeexplore.ieee.org/document/9458907)" In the Proceedings of the 2021 5th IEEE International Conference on Fog and Edge Computing (ICFEC). 2021 [[arXiv preprint]](https://arxiv.org/pdf/2103.01170.pdf) [[video]](https://youtu.be/G70hudAhd5M)
 
-<!-- [3] Antennekaart, [https://antennekaart.nl](https://antennekaart.nl). Accessed: 15/04/2023. -->
-[3] Etablissements classés - Cadastre GSM. (2023). [Data set]. Administration de l’environnement. [http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm](http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm )
+[3] Antennekaart, [https://antennekaart.nl](https://antennekaart.nl). Accessed: 15/04/2023.
 
 [4] [TAPASCologne project](http://kolntrace.project.citi-lab.fr/), Accessed: 24/07/2023.
 
 [5] Yoann Pigné, Grégoire Danoy, Pascal Bouvry. A Vehicular Mobility Model based on Real Traffic Counting Data. In Thomas Strang et al., editors, Nets4Cars/Nets4Trains 2011, Volume 6596, Series Lecture Notes in Computer Science, Pages 131-142. ISBN: 978-3-642-19785-7. Springer, 2011. [VehiLux](https://vehilux.gforge.uni.lu/)
+
+[6] Etablissements classés - Cadastre GSM. (2023). [Data set]. Administration de l’environnement. [http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm](http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm )

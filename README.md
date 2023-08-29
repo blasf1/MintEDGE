@@ -7,18 +7,16 @@
 
 ## What is MintEDGE?
 
-MintEDGE is a flexible edge computing simulation framework that allows the configuration of various aspects of the infrastructure and enables researchers to test novel energy optimization strategies. We build on top of [LEAF](https://github.com/dos-group/leaf/)'s [2] energy model to provide:
+MintEDGE is a flexible edge computing simulation framework that allows the configuration of various aspects of the infrastructure and enables researchers to test novel energy optimization strategies. MintEDGE offers the following features:
 
-- SUMO [3] integration for realistic mobility scenarios.
-
-Characteristics:
-
+- SUMO [2] integration for realistic mobility scenarios.
 - Agnostic w.r.t. Radio Access Network
 - Define your own resource allocation strategy, focused on energy, QoS or both.
 - Use real maps for more realistic scenarios.
 - Import real infrastructure. We provide the data for the Netherlands [4].
 - Import realistic mobility traces such as TAPASCologne [5] or VehiLux [6], or generate yours with SUMO or any other user mobility simulator.
 - You can use MintEDGE to evaluate workload predictors as part of your resource allocation strategy. By default, we provide an ideal predictor.
+- We use the realistic and lightweight energy model from [LEAF](https://github.com/dos-group/leaf/)'s [3].
 
 ## Orchestrator Operation and System Model
 
@@ -76,9 +74,9 @@ Test your own efficient resource allocation or energy efficiency strategy by rep
 
 [1] Blas Gómez, Suzan Bayhan, Estefanía Coronado, José Villalón, Antonio Garrido, "MintEDGE: Multi-tier sImulator for eNergy-aware sTrategies in Edge Computing", In Proc. of ACM MobiCom '23, October, 2023. Madrid, Spain. DOI: 10.1145/3570361.3615727. (to appear)
 
-[2] Philipp Wiesner and Lauritz Thamsen. "[LEAF: Simulating Large Energy-Aware Fog Computing Environments](https://ieeexplore.ieee.org/document/9458907)" In the Proceedings of the 2021 5th IEEE International Conference on Fog and Edge Computing (ICFEC). 2021 [[arXiv preprint]](https://arxiv.org/pdf/2103.01170.pdf) [[video]](https://youtu.be/G70hudAhd5M)
+[2] SUMO - Simulation of Urban MObility, [https://www.eclipse.org/sumo/](https://www.eclipse.org/sumo/). Accessed: 24/07/2023.
 
-[3] SUMO - Simulation of Urban MObility, [https://www.eclipse.org/sumo/](https://www.eclipse.org/sumo/). Accessed: 24/07/2023.
+[3] Philipp Wiesner and Lauritz Thamsen. "[LEAF: Simulating Large Energy-Aware Fog Computing Environments](https://ieeexplore.ieee.org/document/9458907)" In the Proceedings of the 2021 5th IEEE International Conference on Fog and Edge Computing (ICFEC). 2021 [[arXiv preprint]](https://arxiv.org/pdf/2103.01170.pdf) [[video]](https://youtu.be/G70hudAhd5M)
 
 [4] Antennekaart, [https://antennekaart.nl](https://antennekaart.nl). Accessed: 15/04/2023.
 

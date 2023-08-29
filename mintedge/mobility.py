@@ -1,0 +1,464 @@
+import math
+import multiprocessing
+from typing import Tuple
+
+import libsumo
+import simpy
+from tqdm import tqdm
+
+import settings
+from mintedge import Car, Person, Stationary
+
+
+class Location:
+    __slots__ = ["x", "y"]
+
+    def __init__(self, x: float, y: float) -> None:
+        """This class represents a geographical location.
+
+        Args:
+            x (float): X coordinate
+            y (float): Y coordinate
+        """
+        self.x = x
+        self.y = y
+
+    def distance(self, loc: "Location") -> float:
+        """Distance between two locations using the Haversine formula.
+
+        Args:
+            loc (Location): Location to which the distance is calculated.
+        Returns:
+            float: Distance between the two locations.
+        """
+        R = 6371  # radius of Earth in kilometers
+        phi1 = math.radians(loc.y)
+        phi2 = math.radians(self.y)
+        delta_phi = math.radians(self.y - loc.y)
+        delta_lambda = math.radians(self.x - loc.x)
+        a = (
+            math.sin(delta_phi / 2) ** 2
+            + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+        )
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        distance = R * c * 1000  # convert to meters
+        return distance
+
+    def __repr__(self):
+        return f"Location({self.x}, {self.y})"
+
+    def __eq__(self, other):
+        return self.x == other.x and self.y == other.y
+
+    def __hash__(self):
+        return hash((self.x, self.y))
+
+
+class MobilityManager:
+    __slots__ = ["env", "running_users", "users_sliding_window"]
+
+    def __init__(self, env: simpy.Environment):
+        """Class that manages the mobility of users.
+
+        Args:
+            env (simpy.Environment): The simulation environment.
+        """
+        self.env = env
+        self._launch_sumo()
+        self.running_users = {}
+        # Initialize sliding window
+        self.users_sliding_window = []
+        self._initialize_sliding_window()
+
+    def __del__(self):
+        # Mobility finished
+        libsumo.close()
+
+    def _launch_sumo(self):
+        # Leverage sumo for mobility
+        from mintedge import SIMULATION_TIME as sim_time
+
+        libsumo.start(
+            [
+                "sumo",
+                "--net-file",
+                settings.NET_FILE,
+                "--route-files",
+                settings.ROUTES_FILE,
+                "--no-internal-links",
+                "--ignore-route-errors",
+                "--begin",
+                "0",
+                "--end",
+                str(sim_time),
+                "--no-warnings",
+                "--route-steps",
+                str(settings.ORCHESTRATOR_INTERVAL),
+                "--threads",
+                str(multiprocessing.cpu_count()),
+                "--device.rerouting.threads",
+                str(multiprocessing.cpu_count()),
+                "--step-length",
+                str(settings.MOBILITY_STEP),
+                "--step-method.ballistic",
+                "--random",
+            ]
+        )
+
+    # SUMO traces do not have stationary users
+    def run(self, env: simpy.Environment, infr: "Infrastructure"):
+        """Starts the mobility manager process.
+
+        Args:
+            env (simpy.Environment): Simulation environment.
+        """
+
+        while True:
+            users = self._get_next_step()
+
+            for user, loc in users.items():
+                if user not in self.running_users:
+                    env.process(
+                        Car(env, user, infr, self, loc, env.now).run(env)
+                    )
+                    self.running_users[user] = loc
+                else:
+                    self.running_users[user] = loc
+
+            yield env.timeout(settings.MOBILITY_STEP)
+            libsumo.simulationStep()
+            # Remove users that have finished
+            for user in libsumo.simulation.getArrivedIDList():
+                del self.running_users[user]
+
+    def _get_next_step(self):
+        window_slot = {}
+        for car in libsumo.vehicle.getIDList():
+            lon, lat = libsumo.vehicle.getPosition(car)
+            # UTM to WGS84
+            lon, lat = libsumo.simulation.convertGeo(lon, lat)
+            window_slot[f"car_{car}"] = Location(lon, lat)
+
+        for person in libsumo.person.getIDList():
+            lon, lat = libsumo.person.getPosition(person)
+            # UTM to WGS84
+            lon, lat = libsumo.simulation.convertGeo(lon, lat)
+            window_slot[f"person_{person}"] = Location(lon, lat)
+
+        self.users_sliding_window.append(window_slot)
+        libsumo.simulationStep()
+        try:
+            users = self.users_sliding_window.pop(0)
+        except IndexError:
+            users = {}
+
+        return users
+
+    def _initialize_sliding_window(self):
+        for _ in range(
+            0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP
+        ):
+            window_slot = {}
+            for car in libsumo.vehicle.getIDList():
+                lon, lat = libsumo.vehicle.getPosition(car)
+                # UTM to WGS84
+                lon, lat = libsumo.simulation.convertGeo(lon, lat)
+                window_slot[f"car_{car}"] = Location(lon, lat)
+
+            for person in libsumo.person.getIDList():
+                lon, lat = libsumo.person.getPosition(person)
+                # UTM to WGS84
+                lon, lat = libsumo.simulation.convertGeo(lon, lat)
+                window_slot[f"person_{person}"] = Location(lon, lat)
+
+            self.users_sliding_window.append(window_slot)
+            libsumo.simulationStep()
+
+    def get_user_location(self, user_id: str) -> Location:
+        """Returns the location of a user.
+
+        Args:
+            user_id (str): The ID of the user whose location is returned.
+
+        Return:
+            Location: The location of the user.
+        """
+
+        return self.running_users[user_id]
+
+    def get_running_user_count(self) -> int:
+        """Returns the user count.
+
+        Returns:
+            int: User count.
+        """
+        return len(self.running_users)
+
+
+class RandomMobilityManager:
+    __slots__ = ["env", "running_users", "users_sliding_window"]
+
+    def __init__(self, env: simpy.Environment):
+        """Class that manages the mobility of users.
+
+        Args:
+            env (simpy.Environment): The simulation environment.
+        """
+        self.env = env
+        self._launch_sumo()
+        self.running_users = {}
+        # Initialize sliding window
+        self.users_sliding_window = []
+        self._initialize_sliding_window()
+
+    def _launch_sumo(self):
+        # Leverage sumo for mobility
+        from mintedge import SIMULATION_TIME as sim_time
+
+        libsumo.start(
+            [
+                "sumo",
+                "--net-file",
+                settings.NET_FILE,
+                "--no-internal-links",
+                "--ignore-route-errors",
+                "--begin",
+                "0",
+                "--end",
+                str(sim_time),
+                "--no-warnings",
+                "--route-steps",
+                str(settings.ORCHESTRATOR_INTERVAL),
+                "--threads",
+                str(multiprocessing.cpu_count()),
+                "--device.rerouting.threads",
+                str(multiprocessing.cpu_count()),
+                "--step-length",
+                str(settings.MOBILITY_STEP),
+                "--step-method.ballistic",
+                "--random",
+            ]
+        )
+
+    def run(self, env: simpy.Environment, infr: "Infrastructure"):
+        """Starts the mobility manager process.
+
+        Args:
+            env (simpy.Environment): Simulation environment.
+        """
+        while True:
+            users = self._get_next_step()
+            for user, loc in users.items():
+                if user not in self.running_users:
+                    if user.startswith("car"):
+                        env.process(
+                            Car(env, user, infr, self, loc, env.now).run(env)
+                        )
+                        self.running_users[user] = loc
+                    elif user.startswith("person"):
+                        env.process(
+                            Person(env, user, infr, self, loc, env.now).run(env)
+                        )
+                        self.running_users[user] = loc
+                    elif user.startswith("stationary"):
+                        env.process(
+                            Stationary(env, user, infr, self, loc, env.now).run(
+                                env
+                            )
+                        )
+                        self.running_users[user] = loc
+                else:
+                    self.running_users[user] = loc
+            #
+            dead = set(self.running_users.keys()) - set(users.keys())
+            for d in dead:
+                del self.running_users[d]
+            yield env.timeout(settings.MOBILITY_STEP)
+
+    def _get_user_count(self, time: float, max_users: int):
+        """Average number of users at this time step. This is passed to a
+        Poisson distribution to get the actual number of users.
+
+        Args:
+            time (float): Time in seconds since the start of the simulation.
+            max_users (int): Maximum number of users.
+
+        Returns:
+            float: Average number of users.
+        """
+        if (
+            settings.USER_COUNT_DISTRIBUTION is None
+            or settings.USER_COUNT_DISTRIBUTION == []
+        ):
+            return max_users
+
+        hour = time // 3600 % len(settings.USER_COUNT_DISTRIBUTION)
+        min = time // 60 % 60
+        user_dist = settings.USER_COUNT_DISTRIBUTION[int(hour)]
+        user_dist_next = settings.USER_COUNT_DISTRIBUTION[int(hour + 1)]
+        # users (dis)appear little by little not all of a sudden
+        decay_factor = (user_dist - user_dist_next) / 60
+        avg_user_count = (user_dist - decay_factor * min) * max_users
+
+        return int(avg_user_count)
+
+    def _get_next_step(self):
+        # Check the number of cars and create more if necessary
+        cars = self._get_user_count(self.env.now, settings.NUMBER_OF_CARS)
+        if cars > libsumo.vehicle.getIDCount():
+            cars_to_add = cars - libsumo.vehicle.getIDCount()
+            for _ in range(cars_to_add):
+                self._create_random_car(
+                    self.env.now + len(self.users_sliding_window)
+                )
+        # Check the number of people and create more if necessary
+        people = self._get_user_count(self.env.now, settings.NUMBER_OF_PEOPLE)
+        if people > libsumo.vehicle.getIDCount():
+            people_to_add = people - libsumo.vehicle.getIDCount()
+            for _ in range(people_to_add):
+                self._create_random_car(
+                    self.env.now + len(self.users_sliding_window)
+                )
+
+        window_slot = {}
+        window_slot = self._get_slot_cars(window_slot)
+        window_slot = self._get_slot_people(window_slot)
+        window_slot = self._get_slot_stationary(window_slot)
+
+        self.users_sliding_window.append(window_slot)
+        libsumo.simulationStep()
+        try:
+            users = self.users_sliding_window.pop(0)
+        except IndexError:
+            users = {}
+
+        return users
+
+    def get_user_location(self, user_id: str) -> Location:
+        """Returns the location of a user.
+
+        Args:
+            user_id (str): User identifier.
+        Returns:
+            Location: Location of the user.
+        """
+        return self.running_users[user_id]
+
+    def get_running_user_count(self) -> int:
+        """Returns the user count.
+
+        Returns:
+            int: User count.
+        """
+        return len(self.running_users)
+
+    def _get_random_edge(self) -> str:
+        from mintedge import RAND_NUM_GEN as random
+
+        return random.choice(libsumo.edge.getIDList())
+
+    def _create_random_car(self, depart: int):
+        """Creates a random car that departs at the given time.
+
+        Args:
+            depart (int): Departure time
+        """
+        time = libsumo.simulation.getTime()
+        count = len(libsumo.simulation.getLoadedIDList())
+        id = str(int(time)) + "_" + str(count)
+        _, stage, _ = self._get_random_stage(depart)
+        libsumo.route.add(routeID=f"route_{id}", edges=stage.edges)
+        libsumo.vehicle.add(vehID=f"car_{id}", routeID=f"route_{id}")
+
+    def _create_random_person(self, depart: int):
+        """Creates a random person that departs at the given time.
+
+        Args:
+            depart (int): Departure time
+        """
+        time = libsumo.simulation.getTime()
+        count = len(libsumo.simulation.getLoadedIDList())
+        id = str(int(time)) + "_" + str(count)
+        src_edge, stage, _ = self._get_random_stage(depart)
+
+        libsumo.person.add(
+            personID=f"person_{id}", edgeID=src_edge, pos=0, depart=depart
+        )
+        libsumo.person.appendWalkingStage(
+            personID=f"person_{id}", edges=stage.edges, arrivalPos=-1
+        )
+
+    def _get_random_position(self) -> Location:
+        from mintedge import RAND_NUM_GEN as random
+
+        edge = self._get_random_edge()
+        shape = libsumo.lane.getShape(edge + "_0")
+        lon, lat = random.choice(shape)
+        # UTM to WGS84
+        lon, lat = libsumo.simulation.convertGeo(lon, lat)
+        return Location(lon, lat)
+
+    def _get_random_stage(self, depart: int) -> "Stage":
+        while True:
+            dst_edge = self._get_random_edge()
+            src_edge = self._get_random_edge()
+            libsumo.edge.setAllowed(src_edge, "all")
+            stage = libsumo.simulation.findRoute(
+                src_edge, dst_edge, depart=depart
+            )
+            if stage.edges:
+                break
+        return src_edge, stage, dst_edge
+
+    def _initialize_sliding_window(self):
+        # Create random routes and vehicles
+        cars = self._get_user_count(self.env.now, settings.NUMBER_OF_CARS)
+        for _ in tqdm(range(cars), leave=False, desc="Creating random cars"):
+            self._create_random_car(0)
+
+        # Create random routes and people
+        people = self._get_user_count(self.env.now, settings.NUMBER_OF_PEOPLE)
+        for _ in tqdm(
+            range(people), leave=False, desc="Creating random people"
+        ):
+            self._create_random_person(0)
+
+        # Create stationary users
+
+        for _ in range(
+            0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP
+        ):
+            window_slot = {}
+            window_slot = self._get_slot_cars(window_slot)
+            window_slot = self._get_slot_people(window_slot)
+            window_slot = self._get_slot_stationary(window_slot)
+
+            self.users_sliding_window.append(window_slot)
+            libsumo.simulationStep()
+
+    def _get_slot_cars(self, window_slot):
+        for car in libsumo.vehicle.getIDList():
+            lon, lat = libsumo.vehicle.getPosition(car)
+            # UTM to WGS84
+            lon, lat = libsumo.simulation.convertGeo(lon, lat)
+            window_slot[car] = Location(lon, lat)
+        return window_slot
+
+    def _get_slot_people(self, window_slot):
+        for person in libsumo.person.getIDList():
+            lon, lat = libsumo.person.getPosition(person)
+            # UTM to WGS84
+            lon, lat = libsumo.simulation.convertGeo(lon, lat)
+            window_slot[person] = Location(lon, lat)
+        return window_slot
+
+    def _get_slot_stationary(self, window_slot):
+        if len(self.users_sliding_window) == 0:
+            for id in range(settings.NUMBER_OF_STATIONARY):
+                window_slot[f"stationary_{id}"] = self._get_random_position()
+        else:
+            for id in range(settings.NUMBER_OF_STATIONARY):
+                window_slot[f"stationary_{id}"] = self.users_sliding_window[-1][
+                    f"stationary_{id}"
+                ]
+        return window_slot

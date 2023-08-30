@@ -373,8 +373,10 @@ class Simulation:
             )
 
         # If a routes file is provided, it must be a valid file
-        if settings.ROUTES_FILE is not None and not os.path.isfile(
-            settings.ROUTES_FILE
+        if (
+            settings.ROUTES_FILE is not None
+            and not os.path.isfile(settings.ROUTES_FILE)
+            and not settings.RANDOM_ROUTES
         ):
             raise MintEDGESettingsError("ROUTES_FILE is not a valid file")
 

@@ -80,7 +80,7 @@ Test your own efficient resource allocation or energy efficiency strategy by rep
 
 [4] Antennekaart, [https://antennekaart.nl](https://antennekaart.nl). Accessed: 15/04/2023.
 
-[5] [TAPASCologne project](http://kolntrace.project.citi-lab.fr/), Accessed: 24/07/2023.
+[5] [TAPASCologne project](http://kolntrace.project.citi-lab.fr/). Accessed: 24/07/2023.
 
 [6] Yoann Pigné, Grégoire Danoy, Pascal Bouvry. A Vehicular Mobility Model based on Real Traffic Counting Data. In Thomas Strang et al., editors, Nets4Cars/Nets4Trains 2011, Volume 6596, Series Lecture Notes in Computer Science, Pages 131-142. ISBN: 978-3-642-19785-7. Springer, 2011. [VehiLux](https://vehilux.gforge.uni.lu/)
 

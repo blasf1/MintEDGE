@@ -105,32 +105,42 @@ class MobilityManager:
             ]
         )
 
-    # SUMO traces do not have stationary users
     def run(self, env: simpy.Environment, infr: "Infrastructure"):
         """Starts the mobility manager process.
 
         Args:
             env (simpy.Environment): Simulation environment.
         """
-
         while True:
             users = self._get_next_step()
-
             for user, loc in users.items():
                 if user not in self.running_users:
-                    env.process(
-                        Car(env, user, infr, self, loc, env.now).run(env)
-                    )
-                    self.running_users[user] = loc
+                    if user.startswith("car"):
+                        env.process(
+                            Car(env, user, infr, self, loc, env.now).run(env)
+                        )
+                        self.running_users[user] = loc
+                    elif user.startswith("person"):
+                        env.process(
+                            Person(env, user, infr, self, loc, env.now).run(env)
+                        )
+                        self.running_users[user] = loc
+                    elif user.startswith("stationary"):
+                        env.process(
+                            Stationary(env, user, infr, self, loc, env.now).run(
+                                env
+                            )
+                        )
+                        self.running_users[user] = loc
                 else:
                     self.running_users[user] = loc
-
+            #
+            dead = set(self.running_users.keys()) - set(users.keys())
+            for d in dead:
+                del self.running_users[d]
             yield env.timeout(settings.MOBILITY_STEP)
-            libsumo.simulationStep()
-            # Remove users that have finished
-            for user in libsumo.simulation.getArrivedIDList():
-                del self.running_users[user]
 
+    # SUMO traces do not have stationary users
     def _get_next_step(self):
         window_slot = {}
         for car in libsumo.vehicle.getIDList():
@@ -195,22 +205,7 @@ class MobilityManager:
         return len(self.running_users)
 
 
-class RandomMobilityManager:
-    __slots__ = ["env", "running_users", "users_sliding_window"]
-
-    def __init__(self, env: simpy.Environment):
-        """Class that manages the mobility of users.
-
-        Args:
-            env (simpy.Environment): The simulation environment.
-        """
-        self.env = env
-        self._launch_sumo()
-        self.running_users = {}
-        # Initialize sliding window
-        self.users_sliding_window = []
-        self._initialize_sliding_window()
-
+class RandomMobilityManager(MobilityManager):
     def _launch_sumo(self):
         # Leverage sumo for mobility
         from mintedge import SIMULATION_TIME as sim_time
@@ -239,41 +234,6 @@ class RandomMobilityManager:
                 "--random",
             ]
         )
-
-    def run(self, env: simpy.Environment, infr: "Infrastructure"):
-        """Starts the mobility manager process.
-
-        Args:
-            env (simpy.Environment): Simulation environment.
-        """
-        while True:
-            users = self._get_next_step()
-            for user, loc in users.items():
-                if user not in self.running_users:
-                    if user.startswith("car"):
-                        env.process(
-                            Car(env, user, infr, self, loc, env.now).run(env)
-                        )
-                        self.running_users[user] = loc
-                    elif user.startswith("person"):
-                        env.process(
-                            Person(env, user, infr, self, loc, env.now).run(env)
-                        )
-                        self.running_users[user] = loc
-                    elif user.startswith("stationary"):
-                        env.process(
-                            Stationary(env, user, infr, self, loc, env.now).run(
-                                env
-                            )
-                        )
-                        self.running_users[user] = loc
-                else:
-                    self.running_users[user] = loc
-            #
-            dead = set(self.running_users.keys()) - set(users.keys())
-            for d in dead:
-                del self.running_users[d]
-            yield env.timeout(settings.MOBILITY_STEP)
 
     def _get_user_count(self, time: float, max_users: int):
         """Average number of users at this time step. This is passed to a
@@ -333,24 +293,6 @@ class RandomMobilityManager:
             users = {}
 
         return users
-
-    def get_user_location(self, user_id: str) -> Location:
-        """Returns the location of a user.
-
-        Args:
-            user_id (str): User identifier.
-        Returns:
-            Location: Location of the user.
-        """
-        return self.running_users[user_id]
-
-    def get_running_user_count(self) -> int:
-        """Returns the user count.
-
-        Returns:
-            int: User count.
-        """
-        return len(self.running_users)
 
     def _get_random_edge(self) -> str:
         from mintedge import RAND_NUM_GEN as random

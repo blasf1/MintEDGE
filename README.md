@@ -13,8 +13,8 @@ MintEDGE is a flexible edge computing simulation framework that allows the confi
 - Agnostic w.r.t. Radio Access Network
 - Define your own resource allocation strategy, focused on energy, QoS or both.
 - Use real maps for more realistic scenarios.
-- Import real infrastructure. We provide the data for the Netherlands [4].
-- Import realistic mobility traces such as TAPASCologne [5] or VehiLux [6], or generate yours with SUMO or any other user mobility simulator.
+- Ability to import real infrastructures. We provide data for the Netherlands [4] and Luxembourg [5].
+- Import realistic mobility traces such as TAPASCologne [6] or VehiLux [7], or generate yours with SUMO or any other user mobility simulator.
 - You can use MintEDGE to evaluate workload predictors as part of your resource allocation strategy. By default, we provide an ideal predictor.
 - We use the realistic and lightweight energy model from [LEAF](https://github.com/dos-group/leaf/)'s [3].
 
@@ -80,8 +80,8 @@ Test your own efficient resource allocation or energy efficiency strategy by rep
 
 [4] Antennekaart, [https://antennekaart.nl](https://antennekaart.nl). Accessed: 15/04/2023.
 
-[5] [TAPASCologne project](http://kolntrace.project.citi-lab.fr/). Accessed: 24/07/2023.
+[5] Etablissements classés - Cadastre GSM. (2023). [Data set]. Administration de l’environnement. [http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm](http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm )
 
-[6] Yoann Pigné, Grégoire Danoy, Pascal Bouvry. A Vehicular Mobility Model based on Real Traffic Counting Data. In Thomas Strang et al., editors, Nets4Cars/Nets4Trains 2011, Volume 6596, Series Lecture Notes in Computer Science, Pages 131-142. ISBN: 978-3-642-19785-7. Springer, 2011. [VehiLux](https://vehilux.gforge.uni.lu/)
+[6] [TAPASCologne project](http://kolntrace.project.citi-lab.fr/). Accessed: 24/07/2023.
 
-[7] Etablissements classés - Cadastre GSM. (2023). [Data set]. Administration de l’environnement. [http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm](http://data.europa.eu/88u/dataset/etablissements-classes-cadastre-gsm )
+[7] Yoann Pigné, Grégoire Danoy, Pascal Bouvry. A Vehicular Mobility Model based on Real Traffic Counting Data. In Thomas Strang et al., editors, Nets4Cars/Nets4Trains 2011, Volume 6596, Series Lecture Notes in Computer Science, Pages 131-142. ISBN: 978-3-642-19785-7. Springer, 2011. [VehiLux](https://vehilux.gforge.uni.lu/)

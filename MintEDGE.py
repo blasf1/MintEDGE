@@ -1,5 +1,6 @@
 import argparse
 import sys
+import time
 
 import mintedge
 
@@ -21,5 +22,15 @@ if __name__ == "__main__":
     output = args.output
     seed = int(args.seed)
 
+    # Record the start time
+    start_time = time.time()
+
     sim = mintedge.Simulation(sim_time, output, seed)
     sim.run()
+
+    # Record the end time
+    end_time = time.time()
+
+    # Calculate the execution time
+    execution_time = end_time - start_time
+    print(f"Execution Time: {execution_time:.2f} seconds")

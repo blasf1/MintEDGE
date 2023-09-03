@@ -273,10 +273,10 @@ class RandomMobilityManager(MobilityManager):
                 )
         # Check the number of people and create more if necessary
         people = self._get_user_count(self.env.now, settings.NUMBER_OF_PEOPLE)
-        if people > libsumo.vehicle.getIDCount():
-            people_to_add = people - libsumo.vehicle.getIDCount()
+        if people > libsumo.person.getIDCount():
+            people_to_add = people - libsumo.person.getIDCount()
             for _ in range(people_to_add):
-                self._create_random_car(
+                self._create_random_person(
                     self.env.now + len(self.users_sliding_window)
                 )
 

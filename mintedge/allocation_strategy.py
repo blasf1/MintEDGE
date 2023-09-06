@@ -326,8 +326,8 @@ class AllocationStrategy:
                     * serv.input_size
                 )
 
-        if cap < 0:
-            raise ValueError("Link capacity is negative")
+        if round(cap, 3) < 0:
+            raise ValueError(f"Link capacity is negative: {cap}")
 
         return int(cap)
 

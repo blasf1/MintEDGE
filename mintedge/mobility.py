@@ -326,9 +326,13 @@ class RandomMobilityManager(MobilityManager):
         libsumo.person.add(
             personID=f"person_{id}", edgeID=src_edge, pos=0, depart=depart
         )
-        libsumo.person.appendWalkingStage(
-            personID=f"person_{id}", edges=stage.edges, arrivalPos=-1
-        )
+        try:
+            libsumo.person.appendWalkingStage(
+                personID=f"person_{id}", edges=stage.edges, arrivalPos=-1
+            )
+        except libsumo.libsumo.TraCIException:
+            libsumo.person.remove(f"person_{id}")
+            return
 
     def _get_random_position(self) -> Location:
         from mintedge import RAND_NUM_GEN as random

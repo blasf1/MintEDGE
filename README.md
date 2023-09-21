@@ -32,7 +32,7 @@ Tuning these three parameters, the orchestrator controls the operation of the ed
 
 ## Installation
 
-MintEDGE has been tested using Python 3.10. We recommend this version.
+MintEDGE has been tested using Python 3.11. We recommend this version.
 
 1. Clone the repository
 
@@ -48,10 +48,16 @@ cd MintEDGE
 pip install -r requirements.txt
 ```
 
-3. Install SUMO and wget
+3. Install SUMO and its dependencies:
 
 ```bash
-sudo apt-get install sumo sumo-tools sumo-doc wget
+sudo apt-get install sumo sumo-tools sumo-doc
+```
+
+You can install it in your conda environment with the following command:
+
+```bash
+conda install -c blasf1 sumo
 ```
 
 <br>

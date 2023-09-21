@@ -4,7 +4,8 @@ import os
 import shutil
 import tempfile
 import uuid
-
+import requests
+import tempfile
 import libsumo
 import sumolib
 import matplotlib.pyplot as plt
@@ -138,22 +139,37 @@ class Simulation:
         print("Net file not provided, generating from OSM")
         from distutils.spawn import find_executable
 
-        if find_executable("wget") is None:
-            raise MintEDGEError("wget is not installed")
         if find_executable("netconvert") is None:
             raise MintEDGEError("netconvert is not installed")
 
+        # Create a temporary directory
         temp_dir = tempfile.mkdtemp()
+        # Register a function to delete the temporary directory at exit
         atexit.register(lambda: shutil.rmtree(temp_dir, ignore_errors=True))
-        filename = uuid.uuid4().hex
-        file_path = os.path.join(temp_dir, f"{filename}.osm.xml")
-        # Get the map
-        call1 = f"wget http://overpass.openstreetmap.ru/cgi/xapi_meta?*[bbox={str(west)},{str(south)},{str(east)},{str(north)}] -O {file_path}.osm.xml"
-        os.system(call1)
-        # Build the network
-        call2 = f"netconvert --osm-files {file_path}.osm.xml -o {file_path}.net.xml --no-warnings --ignore-errors --remove-edges.isolated --remove-edges.by-vclass rail,rail_fast,bicycle --ramps.guess --junctions.join --tls.join --no-internal-links --no-turnarounds --roundabouts.guess --offset.disable-normalization --output.original-names"
-        os.system(call2)
-        settings.NET_FILE = f"{file_path}.net.xml"
+
+        output_file_path = os.path.join(temp_dir, "map.net.xml")
+
+        # Define the URL and parameters for the download
+        url = f"http://overpass.openstreetmap.ru/cgi/xapi_meta?*[bbox={west},{south},{east},{north}]"
+        # Get the map from OSM and save it to a temporary file
+        print("Downloading map from OSM, this may take a while...")
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            # Write the response content to the temporary file
+            with tempfile.NamedTemporaryFile(
+                dir=temp_dir, suffix=".osm.xml", delete=False
+            ) as temp_file:
+                temp_file.write(response.content)
+
+                # Convert the OSM file to a SUMO network file
+                call = f"netconvert --osm-files {temp_file.name} -o {output_file_path} --no-warnings --ignore-errors --remove-edges.isolated --remove-edges.by-vclass rail,rail_fast,bicycle --ramps.guess --junctions.join --tls.join --no-internal-links --no-turnarounds --roundabouts.guess --offset.disable-normalization --output.original-names"
+                os.system(call)
+        else:
+            raise MintEDGEError(
+                f"Failed to download file. HTTP status code: {response.status_code}"
+            )
+        settings.NET_FILE = output_file_path
 
     def _filter_infrastructure(self, df_bss, df_links):
         (w, s), (e, n) = libsumo.simulation.getNetBoundary()

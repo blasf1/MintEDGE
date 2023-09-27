@@ -163,7 +163,7 @@ class Simulation:
                 temp_file.write(response.content)
 
                 # Convert the OSM file to a SUMO network file
-                call = f"netconvert --osm-files {temp_file.name} -o {output_file_path} --no-warnings --ignore-errors --remove-edges.isolated --remove-edges.by-vclass rail,rail_fast,bicycle --ramps.guess --junctions.join --tls.join --no-internal-links --no-turnarounds --roundabouts.guess --offset.disable-normalization --output.original-names"
+                call = f"netconvert --osm-files {temp_file.name} -o {output_file_path} --no-warnings --ignore-errors --remove-edges.isolated --remove-edges.by-type railway.rail,railway.tram,railway.light_rail,railway.subway,railway.preserved,highway.pedestrian,highway.cycleway,highway.footway,highway.bridleway,highway.steps,highway.step,highway.stairs --ramps.guess --junctions.join --tls.join --no-internal-links --no-turnarounds --roundabouts.guess --offset.disable-normalization --output.original-names"
                 os.system(call)
         else:
             raise MintEDGEError(

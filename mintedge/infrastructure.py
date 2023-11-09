@@ -2,7 +2,8 @@ import math
 from typing import Dict, List, Optional
 
 import networkx as nx
-import simpy
+from simpy.core import Environment
+from simpy.events import Event
 from tqdm import tqdm
 
 from mintedge import (
@@ -36,7 +37,7 @@ class EdgeServer(EnergyAware):
 
     def __init__(
         self,
-        env: simpy.Environment,
+        env: Environment,
         name: str,
         max_cap: float,
         idle_power: int,
@@ -200,9 +201,7 @@ class EdgeServer(EnergyAware):
         """
 
         try:
-            self.allocated_ops_bs_a[src.name][a.name] = math.floor(
-                req * a.workload
-            )
+            self.allocated_ops_bs_a[src.name][a.name] = math.floor(req * a.workload)
         except KeyError:
             try:
                 self.allocated_ops_bs_a[src.name] = {
@@ -283,9 +282,7 @@ class Link(EnergyAware):
         "energy_model",
     ]
 
-    def __init__(
-        self, src: BaseStation, dst: BaseStation, cap: float, sigma: float
-    ):
+    def __init__(self, src: BaseStation, dst: BaseStation, cap: float, sigma: float):
         """A network link connecting base stations
 
         Args:
@@ -391,13 +388,13 @@ class Infrastructure:
         "kpis",
     ]
 
-    def __init__(self, env: simpy.Environment):
+    def __init__(self, env: Environment):
         """Infrastructure graph of the simulated scenario.
         The infrastructure is multigraph G of BS and Links.
         Base Stations may or may not have Edge servers
 
         Args:
-            env (simpy.Environment): The simulation environment.
+            env (Environment): The simulation environment.
         """
         self.env = env  # Simulation environment
         self.bss = {}  # Base Stations
@@ -426,13 +423,9 @@ class Infrastructure:
             location (Location): The (x,y) coordinates of the BS.
         """
         self.bss[name] = BaseStation(name, rate, edge_server, location)
-        self.nxgraph.add_node(
-            self.bss[name], location=location, bs=self.bss[name]
-        )
+        self.nxgraph.add_node(self.bss[name], location=location, bs=self.bss[name])
 
-    def add_link(
-        self, src: BaseStation, dst: BaseStation, capacity: int, sigma: float
-    ):
+    def add_link(self, src: BaseStation, dst: BaseStation, capacity: int, sigma: float):
         """Adds a link to the infrastructure
 
         Args:
@@ -529,20 +522,19 @@ class Infrastructure:
             user.bs.users.append(user)
 
     def send_requests(
-        self, env: simpy.Environment, src: BaseStation, serv: str, req: int
-    ) -> List[simpy.Event]:
+        self, env: Environment, src: BaseStation, serv: str, req: int
+    ) -> List[Event]:
         """Receives requests from users and allocates capacity to them.
 
         Args:
-            env (simpy.Environment): The simulation environment.
+            env (Environment): The simulation environment.
             src (BaseStation): Source Base Station.
             serv (str): Service that is being requested.
             req (int): Number of requests that need allocation.
 
         Returns:
-            List[simpy.Event]: List of events that are triggered when the
-                requests have been completely attended (and its capacity
-                can be released)
+            List[Event]: List of events that are triggered when the requests
+                have been completely attended (and its capacity can be released)
         """
 
         if env.now not in self.kpis:
@@ -568,10 +560,7 @@ class Infrastructure:
                 path = self.paths[(src.name, dst)]
                 bps = math.ceil(
                     fitting_req
-                    * (
-                        self.services[serv].input_size
-                        + self.services[serv].output_size
-                    )
+                    * (self.services[serv].input_size + self.services[serv].output_size)
                 )
                 self._allocate_path_capacity(path, bps)
 
@@ -585,9 +574,7 @@ class Infrastructure:
             # create a process to eliminate the requests after they are attended
             events.append(
                 env.process(
-                    self._complete_req(
-                        env, src, self.bss[dst], serv, fitting_req
-                    )
+                    self._complete_req(env, src, self.bss[dst], serv, fitting_req)
                 )
             )
             # Register servers' utilization
@@ -597,9 +584,7 @@ class Infrastructure:
         if attended_req < req - 1:  # missing one is fine. Rounding errors.
             src_a = f"{src}_{serv}"
             if f"rejected_req_{src_a}" in self.kpis[env.now]:
-                self.kpis[env.now][f"rejected_req_{src_a}"] += (
-                    req - attended_req
-                )
+                self.kpis[env.now][f"rejected_req_{src_a}"] += req - attended_req
             else:
                 self.kpis[env.now][f"rejected_req_{src_a}"] = req - attended_req
 
@@ -611,7 +596,7 @@ class Infrastructure:
 
     def _reject_requests(
         self,
-        env: simpy.Environment,
+        env: Environment,
         src: BaseStation,
         dst: str,
         serv: str,
@@ -620,7 +605,7 @@ class Infrastructure:
         """Rejects requests that do not fit in the server or in the backhaul.
 
         Args:
-            env (simpy.Environment): Simulation environment.
+            env (Environment): Simulation environment.
             src (BaseStation): Base Station where the requests were received.
             dst (str): Base Station where the server that attended the
                 requests is.
@@ -633,9 +618,7 @@ class Infrastructure:
         """
         # Reject requests if they do not fit in the server
         rejected_s = 0
-        avail_cap = self.bss[dst].server.get_avail_cap_bs_serv(
-            src, self.services[serv]
-        )
+        avail_cap = self.bss[dst].server.get_avail_cap_bs_serv(src, self.services[serv])
         fitting_req = math.floor(avail_cap / self.services[serv].workload)
 
         if fitting_req < total_req:
@@ -648,10 +631,7 @@ class Infrastructure:
 
             fitting_req_l = round(
                 avail_cap
-                / (
-                    self.services[serv].input_size
-                    + self.services[serv].output_size
-                )
+                / (self.services[serv].input_size + self.services[serv].output_size)
             )
             if fitting_req_l < fitting_req:
                 rejected_l = fitting_req - fitting_req_l
@@ -660,9 +640,7 @@ class Infrastructure:
         self._register_rejections(env, src, serv, rejected)
         return total_req - rejected, rejected
 
-    def _compute_delays(
-        self, src: BaseStation, dst: BaseStation, a: str, req: int
-    ):
+    def _compute_delays(self, src: BaseStation, dst: BaseStation, a: str, req: int):
         """Computes the delays of a batch of requests sent to the same BS at
         the same time and attended by the same edge server. The delays are
         added to the KPIs dictionary.
@@ -709,7 +687,7 @@ class Infrastructure:
 
     def _complete_req(
         self,
-        env: simpy.Environment,
+        env: Environment,
         src: BaseStation,
         dst: BaseStation,
         a: str,
@@ -740,19 +718,17 @@ class Infrastructure:
         if dst != src:
             # Release resources in the backhaul
             path = self.paths[(src.name, dst.name)]
-            bps = req * (
-                self.services[a].input_size + self.services[a].output_size
-            )
+            bps = req * (self.services[a].input_size + self.services[a].output_size)
             self._release_path_capacity(path, bps)
 
     def _register_requests(
-        self, env: simpy.Environment, src: BaseStation, serv: str, req: int
+        self, env: Environment, src: BaseStation, serv: str, req: int
     ):
         """Register the total number of requests in this time step in
         the KPIs dictionary.
 
         Args:
-            env (simpy.Environment): Simulation environment.
+            env (Environment): Simulation environment.
             src (BaseStation): Source base station (where the requests were
                 received).
             serv (str): Service name.
@@ -774,12 +750,12 @@ class Infrastructure:
             self.kpis[env.now]["total_requests"] = req
 
     def _register_rejections(
-        self, env: simpy.Environment, src: BaseStation, serv: str, rej: int
+        self, env: Environment, src: BaseStation, serv: str, rej: int
     ):
         """Register the number of rejected requests in the KPIs dictionary.
 
         Args:
-            env (simpy.Environment): Simulation environment.
+            env (Environment): Simulation environment.
             src (BaseStation): Source base station (where the requests
                 were received)
             serv (str): Service name.
@@ -799,11 +775,11 @@ class Infrastructure:
         else:
             self.kpis[env.now]["total_rejected"] = rej
 
-    def _register_server_utilization(self, env: simpy.Environment, dst: str):
+    def _register_server_utilization(self, env: Environment, dst: str):
         """Save the current server utilization in the KPIs dictionary.
 
         Args:
-            env (simpy.Environment): Simulation environment.
+            env (Environment): Simulation environment.
             dst (str): Name of the destination base station.
         """
         if self.bss[dst].server is not None:
@@ -840,9 +816,7 @@ class Infrastructure:
         for link in path:
             link.release_bps(bps)
 
-    def get_path_delay(
-        self, src: BaseStation, dst: BaseStation, a: Service
-    ) -> float:
+    def get_path_delay(self, src: BaseStation, dst: BaseStation, a: Service) -> float:
         """Returns the total delay of a path.
 
         Args:
@@ -855,8 +829,7 @@ class Infrastructure:
         if src == dst:
             return 0
         return sum(
-            link.get_delay(a.input_size)
-            for link in self.paths[(src.name, dst.name)]
+            link.get_delay(a.input_size) for link in self.paths[(src.name, dst.name)]
         )
 
     def get_path_out_delay(

@@ -28,20 +28,22 @@ class IdealPredictor:
         self.mob_mngr = mob_mngr
         self.env = env
 
-    def get_max_demand(self) -> Dict[str, Dict[str, float]]:
+    def get_max_demand(self) -> Dict[str, Dict[str, int]]:
         """Returns the maximum lambda for a given period.
 
         Returns:
             Dict[str, Dict[str, float]]: The maximum lambda for a given period.
         """
-        max_demand = defaultdict(lambda: defaultdict(float))
+        max_demand = {bs: {a: 0 for a in self.infr.services} for bs in self.infr.bss}
 
         users_per_time = self.mob_mngr.users_sliding_window
         services = self.infr.services
         bss = self.infr.bss
 
         for users in users_per_time:
-            new_demand = defaultdict(lambda: defaultdict(float))
+            new_demand = {
+                bs: {a: 0 for a in self.infr.services} for bs in self.infr.bss
+            }
             for _, loc in users.items():
                 bs = self.get_connected_bs(loc)
                 if bs is None:
@@ -50,9 +52,7 @@ class IdealPredictor:
                     # TODO: This works only if all users use all services
                     max_demand[bs.name][serv.name] += serv.arrival_rate
             for bs, serv in itertools.product(bss, services):
-                max_demand[bs][serv] = max(
-                    max_demand[bs][serv], new_demand[bs][serv]
-                )
+                max_demand[bs][serv] = max(max_demand[bs][serv], new_demand[bs][serv])
 
         return max_demand
 

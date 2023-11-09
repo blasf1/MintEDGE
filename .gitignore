@@ -163,6 +163,7 @@ cython_debug/
 cache/
 .vscode/
 *.csv
+*.parquet
 *.xml
 *.pdf
 tests/

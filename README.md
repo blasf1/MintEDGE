@@ -78,7 +78,7 @@ Test your own efficient resource allocation or energy efficiency strategy by rep
 
 ## References
 
-[1] Blas Gómez, Suzan Bayhan, Estefanía Coronado, José Villalón, Antonio Garrido, "MintEDGE: Multi-tier sImulator for eNergy-aware sTrategies in Edge Computing", In Proc. of ACM MobiCom '23, October, 2023. Madrid, Spain. DOI: 10.1145/3570361.3615727. (to appear)
+[1] Blas Gómez, Suzan Bayhan, Estefanía Coronado, José Villalón, Antonio Garrido, "MintEDGE: Multi-tier sImulator for eNergy-aware sTrategies in Edge Computing", In Proc. of ACM MobiCom '23, October, 2023. Madrid, Spain. DOI: [10.1145/3570361.3615727](https://dl.acm.org/doi/abs/10.1145/3570361.3615727).
 
 [2] SUMO - Simulation of Urban MObility, [https://www.eclipse.org/sumo/](https://www.eclipse.org/sumo/). Accessed: 24/07/2023.
 

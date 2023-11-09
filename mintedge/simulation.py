@@ -3,7 +3,7 @@ import itertools
 import os
 import shutil
 import tempfile
-import uuid
+
 import requests
 import tempfile
 import libsumo
@@ -11,10 +11,12 @@ import sumolib
 import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
-import osmnx as ox
+
 import pandas as pd
-import simpy
-from tqdm.auto import tqdm
+
+from simpy.core import Environment
+from tqdm.auto import tqdm, trange
+from pathlib import Path
 
 import mintedge
 import settings
@@ -33,10 +35,21 @@ class MintEDGEError(Exception):
 
 
 class Simulation:
-    __slots__ = ["simulation_time", "seed", "output_file"]
+    __slots__ = ["sim_time", "seed", "output_file"]
 
-    def __init__(self, simulation_time: float, output_file: str, seed: int):
-        self.simulation_time = simulation_time
+    def __init__(self, simulation_time: int, output_file: str, seed: int):
+        """
+        Initialize a Simulation object with the given simulation time, output file path, and random seed.
+
+        Args:
+            simulation_time (int): The duration of the simulation in seconds.
+            output_file (str): The path to the output file where simulation results will be saved.
+            seed (int): The random seed to use for the simulation.
+
+        Returns:
+            None
+        """
+        self.sim_time = simulation_time
         self._set_simulation_time(simulation_time)
         self.seed = seed
         self._set_seed(seed)
@@ -56,8 +69,16 @@ class Simulation:
             pass
 
     def run(self):
+        """
+        Runs the simulation by setting up the environment, creating the
+        infrastructure, and running the orchestrator.
+
+        Returns:
+            None
+        """
+
         #  Set up simulation
-        env = simpy.Environment()
+        env = Environment()
         if settings.RANDOM_ROUTES:
             mobility_manager = mintedge.RandomMobilityManager(env)
         else:
@@ -65,18 +86,20 @@ class Simulation:
         infr = self.create_infrastructure(env)
         if settings.PLOT_SCENARIO:
             self.plot_scenario(infr)
-        orch = mintedge.Orchestrator(infr, mobility_manager, env)
+        orch = mintedge.Orchestrator(
+            infr, mobility_manager, env, Path(self.output_file)
+        )
         env.process(mobility_manager.run(env, infr))
         env.process(orch.run(env))
 
         #  Run simulation
         print("Running simulation...")
-        for until in tqdm(range(1, self.simulation_time + 1)):
+        for until in trange(
+            1,
+            self.sim_time + 2,
+            bar_format="{l_bar}{bar}| [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+        ):
             env.run(until=until)
-
-        #  Write results to file
-        df = pd.DataFrame.from_dict(orch.measurements, orient="index")
-        df.to_csv(self.output_file, index_label="time", sep=",")
 
     def _set_seed(self, seed):
         mintedge.SEED = seed
@@ -127,15 +150,13 @@ class Simulation:
             )
 
         net = sumolib.net.readNet(settings.NET_FILE)
-        fig, ax = plt.subplots(figsize=(10, 10))
+        _, ax = plt.subplots(figsize=(10, 10))
         plot_roads(net, ax)
         plot_network(net)
         # Show the plot
         plt.savefig("network_graph.pdf", bbox_inches="tight")
 
-    def create_sumo_net(
-        self, north: float, south: float, east: float, west: float
-    ):
+    def create_sumo_net(self, north: float, south: float, east: float, west: float):
         print("Net file not provided, generating from OSM")
         from distutils.spawn import find_executable
 
@@ -175,9 +196,7 @@ class Simulation:
         (w, s), (e, n) = libsumo.simulation.getNetBoundary()
         w, s = libsumo.simulation.convertGeo(w, s)
         e, n = libsumo.simulation.convertGeo(e, n)
-        print(
-            f"Map boundaries: west - {w}, south - {s}, east - {e}, north - {n}"
-        )
+        print(f"Map boundaries: west - {w}, south - {s}, east - {e}, north - {n}")
         df_bss = df_bss[(df_bss["provider"] == settings.PROVIDER)]
         df_bss = df_bss[(df_bss["lon"] > w)]
         df_bss = df_bss[(df_bss["lon"] < e)]
@@ -238,26 +257,6 @@ class Simulation:
         # Check if there are still isolated subgraphs and recursively connect them
         return self.make_connected(infr)
 
-    def top_k_server_placement(self, env, infr, k):
-        # Sort the nodes by their degree
-        nodes = sorted(infr.nxgraph.degree, key=lambda x: x[1], reverse=True)
-
-        # Place the servers
-        for i in range(k):
-            node_name = nodes[i][0].name
-            infr.bss[node_name].set_edge_server(
-                mintedge.EdgeServer(
-                    env,
-                    node_name,
-                    settings.MAX_SERVER_CAPACITY,
-                    idle_power=settings.IDLE_SERVER_POWER,
-                    max_power=settings.MAX_SERVER_POWER,
-                    boot_time=settings.SERVER_BOOT_TIME,
-                )
-            )
-
-        return infr
-
     def deterministic_server_placement(self, env, infr, k):
         # Calculate the centrality of each node based on degree and location
         centrality = {}
@@ -272,9 +271,7 @@ class Simulation:
             for neighbor in infr.nxgraph.neighbors(node):
                 x_neighbor = infr.nxgraph.nodes[neighbor]["location"].x
                 y_neighbor = infr.nxgraph.nodes[neighbor]["location"].y
-                distance = (
-                    (x - x_neighbor) ** 2 + (y - y_neighbor) ** 2
-                ) ** 0.5
+                distance = ((x - x_neighbor) ** 2 + (y - y_neighbor) ** 2) ** 0.5
                 distance_sum += distance
             # Multiply by inverse distance sum to give more weight to nodes
             # that are further away from their neighbors (spread them through the map)
@@ -304,9 +301,7 @@ class Simulation:
 
         return infr
 
-    def create_infrastructure(
-        self, env: simpy.Environment
-    ) -> mintedge.Infrastructure:
+    def create_infrastructure(self, env: Environment) -> mintedge.Infrastructure:
         infr = mintedge.Infrastructure(env)
         # Add services
         for s in settings.SERVICES:
@@ -324,9 +319,7 @@ class Simulation:
         if len(df) == 0:
             raise MintEDGEError("No base stations found in the given area")
 
-        for i, row in tqdm(
-            df.iterrows(), desc="Adding base stations", leave=False
-        ):
+        for i, row in tqdm(df.iterrows(), desc="Adding base stations", leave=False):
             location = mintedge.Location(row["lon"], row["lat"])
             infr.add_base_station(
                 "BS" + str(i), settings.BS_DATARATE, None, location
@@ -336,12 +329,8 @@ class Simulation:
         link_dict = {}
         for i, row in df_links.iterrows():
             try:
-                site1 = "BS" + str(
-                    df[df["location_id"] == row["src_id"]].index[0]
-                )
-                site2 = "BS" + str(
-                    df[df["location_id"] == row["dst_id"]].index[0]
-                )
+                site1 = "BS" + str(df[df["location_id"] == row["src_id"]].index[0])
+                site2 = "BS" + str(df[df["location_id"] == row["dst_id"]].index[0])
             except IndexError:
                 continue
             col = "r"
@@ -354,7 +343,7 @@ class Simulation:
             infr.add_link(
                 infr.bss[site1],
                 infr.bss[site2],
-                settings.MAX_LINK_CAPACITY,
+                int(settings.MAX_LINK_CAPACITY),
                 settings.W_PER_BIT,
             )
 
@@ -377,9 +366,7 @@ class Simulation:
             raise MintEDGESettingsError("Currently, BSS_FILE must be set")
 
         # Random links is supported but, atm, file is needed even if empty
-        if settings.LINKS_FILE is None or not os.path.isfile(
-            settings.LINKS_FILE
-        ):
+        if settings.LINKS_FILE is None or not os.path.isfile(settings.LINKS_FILE):
             raise MintEDGESettingsError("Currently, LINKS_FILE must be set")
 
         # If random routes are not used, a routes file must be provided
@@ -403,9 +390,7 @@ class Simulation:
             )
 
         if settings.ROUTES_FILE is not None and settings.NET_FILE is None:
-            raise MintEDGESettingsError(
-                "If ROUTES_FILE is set, NET_FILE must be set"
-            )
+            raise MintEDGESettingsError("If ROUTES_FILE is set, NET_FILE must be set")
 
         # Either the net file or the bounds must be set
         try:

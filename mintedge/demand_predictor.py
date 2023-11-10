@@ -1,20 +1,15 @@
 from typing import Dict
-import simpy
+from simpy.core import Environment
 import settings
 import itertools
-from tqdm import tqdm
 from mintedge import Infrastructure, BaseStation, MobilityManager, Location
-from collections import defaultdict
 
 
 class IdealPredictor:
     __slots__ = ["infr", "mob_mngr", "env"]
 
     def __init__(
-        self,
-        infr: Infrastructure,
-        mob_mngr: MobilityManager,
-        env: simpy.Environment,
+        self, infr: Infrastructure, mob_mngr: MobilityManager, env: Environment
     ):
         """This class represents an ideal predictor.
         It can be replaced by any other kind of load predictor.
@@ -22,7 +17,7 @@ class IdealPredictor:
         Args:
             infr (Infrastructure): the infrastructure of the simulation.
             mob_mngr (MobilityManager): the mobility manager of the simulation.
-            env (simpy.Environment): the simulation environment.
+            env (Environment): the simulation environment.
         """
         self.infr = infr
         self.mob_mngr = mob_mngr

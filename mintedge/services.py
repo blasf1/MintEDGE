@@ -6,7 +6,7 @@ class Service:
         arrival_rate: float,
         input_size: int,
         output_size: int,
-        max_delay: int,
+        max_delay: float,
     ):
         """Class representing a service. A service k can be instanced in each
         Edge Server, and a different instance may be added for each base
@@ -17,7 +17,7 @@ class Service:
             arrival_rate (float): Number of req per sec caused by this service
             input_size (int): Bytes of data per request made to this service
             output_size (int): Bytes of data per request returned by this service
-            max_delay (int): Maximum delay that the service can tolerate
+            max_delay (float): Maximum delay that the service can tolerate
         """
         self.name = name
         self.workload = workload

@@ -41,16 +41,18 @@ class EdgeServer(EnergyAware):
         name: str,
         max_cap: float,
         idle_power: int,
-        max_power: Optional[int] = None,
+        max_power: int,
         boot_time: Optional[int] = None,
     ):
         """This class represents an edge server in the infrastructure.
 
         Args:
+            env (Environment): The simulation environment.
             name (str): Friendly name of the edge server
             max_cap (float): Maximum processing capacity in ops per second
             idle_power (int): Power consumed by the edge server when it is idle
             max_power (int, optional): Power consumed at 100% utilization
+            boot_time (int, optional): Time it takes to boot the server
         """
         self.env = env
         self.name = name
@@ -63,8 +65,8 @@ class EdgeServer(EnergyAware):
         self.op_energy = (max_power - idle_power) / max_cap
         self.energy_model = EnergyModelServer()
         self.energy_model.set_parent(self)
-        self.allocated_ops_bs_a: Dict[BaseStation, Dict[Service, int]] = {}
-        self.used_ops_bs_a: Dict[BaseStation, Dict[Service, int]] = {}
+        self.allocated_ops_bs_a: Dict[str, Dict[str, int]] = {}
+        self.used_ops_bs_a: Dict[str, Dict[str, int]] = {}
         self.boot_time = boot_time
         self.last_onoff_time = 0
 
@@ -222,7 +224,7 @@ class EdgeServer(EnergyAware):
 
         if req < 0:
             raise Exception(
-                f"Cannot allocate resources for negative number of requests. Something's wrong somewhere else."
+                f"Cannot allocate resources for negative number of requests."
             )
 
 
@@ -339,6 +341,7 @@ class Link(EnergyAware):
 
     def release_bps(self, bps: int):
         """Rleases bps bits in the link.
+
         Args:
             bps (int): The capacity to be released in bps.
         """
@@ -351,6 +354,7 @@ class Link(EnergyAware):
 
     def allocate_capacity(self, bps: int):
         """Allocates bps bits in the link.
+
         Args:
             bps (int): The capacity to be allocated in bps.
         """
@@ -363,6 +367,7 @@ class Link(EnergyAware):
 
     def check_capacity(self, bps: int):
         """Checks if bps bits can be allocated in the link.
+
         Args:
             bps (int): The capacity to be allocated in bps.
         """

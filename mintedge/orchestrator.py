@@ -84,7 +84,7 @@ class Orchestrator:
         """Starts the orchestrator process
 
         Args:
-            env ( Environment): The simulation environment
+            env (Environment): The simulation environment
         """
 
         # Run orchestrator process
@@ -256,7 +256,7 @@ class Orchestrator:
                     )
                     # Apply assigantion
                     if src != dst:
-                        req = math.ceil(
+                        req = math.floor(
                             new_demand_mat[src.name][serv.name]
                             * new_assig_mat[src.name][serv.name][dst.name]
                         )

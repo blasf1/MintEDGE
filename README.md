@@ -67,7 +67,7 @@ conda install -c blasf1 sumo
 You can run the simulator with the following command:
 
 ``` bash
-python MintEDGE.py --simulation-time 3600 --seed 1 --output results.csv
+python MintEDGE.py --simulation-time 3600 --seed 1 --output results.parquet
 ```
 
 You can adjust the simulation time, the seed and the output file in the command line. This facilitates launching multiple simulations simultaneously in distributed environments, e.g. a cluster with SLURM scheduler. Other settings can be adjusted in the settings.py file

@@ -246,8 +246,8 @@ class Simulation:
                 )
 
         infr.add_link(
-            infr.bss[closest_node1.name],
-            infr.bss[closest_node2.name],
+            infr.bss[closest_node1.name],  # type: ignore
+            infr.bss[closest_node2.name],  # type: ignore
             settings.MAX_LINK_CAPACITY,
             settings.W_PER_BIT,
         )

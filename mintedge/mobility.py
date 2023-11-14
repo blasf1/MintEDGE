@@ -1,10 +1,8 @@
 import math
 import multiprocessing
-from typing import Tuple
 
 import libsumo
 
-# import simpy
 from simpy.core import Environment
 from tqdm import tqdm
 

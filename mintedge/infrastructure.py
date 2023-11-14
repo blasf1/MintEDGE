@@ -45,7 +45,7 @@ class EdgeServer(EnergyAware):
         self,
         env: Environment,
         name: str,
-        max_cap: float,
+        max_cap: int,
         idle_power: int,
         max_power: int,
         boot_time: Optional[int] = None,
@@ -55,7 +55,7 @@ class EdgeServer(EnergyAware):
         Args:
             env (Environment): The simulation environment.
             name (str): Friendly name of the edge server
-            max_cap (float): Maximum processing capacity in ops per second
+            max_cap (int): Maximum processing capacity in ops per second
             idle_power (int): Power consumed by the edge server when it is idle
             max_power (int, optional): Power consumed at 100% utilization
             boot_time (int, optional): Time it takes to boot the server

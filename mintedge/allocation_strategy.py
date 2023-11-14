@@ -13,6 +13,12 @@ from mintedge import (
 )
 
 
+class MintEDGEAllocationError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+
 class AllocationStrategy:
     __slots__ = ["infr"]
 
@@ -25,12 +31,12 @@ class AllocationStrategy:
         """
         self.infr = infr
 
-    def get_allocation(self, demand_matrix: Dict[str, Dict[str, float]]):
+    def get_allocation(self, demand_matrix: Dict[str, Dict[str, int]]):
         """Allocate resources on the infrastructure in a greedy manner
         (closer first)
 
         Args:
-            demand_matrix (Dict[str, Dict[str, float]]): Demand matrix
+            demand_matrix (Dict[str, Dict[str, int]]): Demand matrix
 
         Returns:
             Dict[str, int]: on/off state of the servers
@@ -42,22 +48,21 @@ class AllocationStrategy:
         # Initializations
         assig_matrix = defaultdict(
             lambda: defaultdict(lambda: defaultdict(float))
-        )
+        )  # type: Dict[str, Dict[str, Dict[str, float]]]
 
-        alloc_matrix = defaultdict(lambda: defaultdict(float))
+        alloc_matrix = defaultdict(
+            lambda: defaultdict(float)
+        )  # type: Dict[str, Dict[str, float]]
 
         server_status = {
-            bs.name: 1 if bs.server is not None else 0
-            for bs in infr.bss.values()
+            bs.name: 1 if bs.server is not None else 0 for bs in infr.bss.values()
         }  # all servers are active
 
         used_cap = {bs: 0 for bs in infr.bss}
 
         # Check if there is enough capacity in the infrastructure
         total_capacity = sum(
-            bs.server.max_cap
-            for bs in infr.bss.values()
-            if bs.server is not None
+            bs.server.max_cap for bs in infr.bss.values() if bs.server is not None
         )
         total_demand = sum(
             serv.workload * demand_matrix[bs][serv.name]
@@ -66,7 +71,7 @@ class AllocationStrategy:
         )
 
         if total_demand > total_capacity:
-            raise Exception("Not enough capacity")
+            raise MintEDGEAllocationError("Not enough capacity")
 
         # Main loop
         for src, serv in tqdm(
@@ -108,7 +113,7 @@ class AllocationStrategy:
         req_to_route: int,
         demand_mat: Dict[str, Dict[str, int]],
         assig_mat: Dict[str, Dict[str, Dict[str, float]]],
-        used_cap: Dict[str, float],
+        used_cap: Dict[str, int],
     ):
         """Routes requests for service a coming from src to the servers in
         candidates depending on their capacity and that of the links.
@@ -121,7 +126,7 @@ class AllocationStrategy:
             demand_mat (Dict[str, Dict[str, int]]): Request matrix
             assig_mat (Dict[str, Dict[str, Dict[str, float]]]): Current
                 assignation matrix
-            used_cap (Dict[str, float]): Used capacity in each server
+            used_cap (Dict[str, int]): Used capacity in each server
 
         Returns:
             Dict[str, Dict[str, Dict[str, float]]]: New assignation
@@ -157,11 +162,8 @@ class AllocationStrategy:
                 assig_req / demand_mat[src.name][serv.name]
             )
             used_cap[dst.name] += self._req_to_ops(assig_req, serv)
-            e_route += (
-                self._req_to_ops(assig_req, serv) * dst.server.op_energy
-            ) + (
-                self._req_to_bits(assig_req, serv)
-                * self.infr.get_path_sigma(path)
+            e_route += (self._req_to_ops(assig_req, serv) * dst.server.op_energy) + (
+                self._req_to_bits(assig_req, serv) * self.infr.get_path_sigma(path)
             )
 
         return assig_mat, req_to_route, used_cap, e_route
@@ -257,9 +259,7 @@ class AllocationStrategy:
         cand_servers = []
 
         # Get all paths from bsi to all other base stations.
-        cand_paths = {
-            k: v for k, v in self.infr.paths.items() if k[0] is src.name
-        }
+        cand_paths = {k: v for k, v in self.infr.paths.items() if k[0] is src.name}
         # Get BSs with a server and within the delay budget
         for path in cand_paths:
             dst = self.infr.bss[path[1]]
@@ -315,9 +315,7 @@ class AllocationStrategy:
         cap = link.capacity
         # friendly name for list of services
         srvcs = self.infr.services.values()
-        for (src, dst), serv in itertools.product(
-            self.infr.paths.keys(), srvcs
-        ):
+        for (src, dst), serv in itertools.product(self.infr.paths.keys(), srvcs):
             path = self.infr.paths[(src, dst)]
             if link in path:
                 cap -= (
@@ -349,11 +347,9 @@ class AllocationStrategy:
         Returns:
             int: Remaining capacity in bps.
         """
-        if len(path) == 0:
-            return math.inf
         return min(
-            self._calculate_alpha_link(link, demand_mat, assig_mat)
-            for link in path
+            (self._calculate_alpha_link(link, demand_mat, assig_mat) for link in path),
+            default=math.inf,  # type: ignore
         )
 
     def _calculate_cpu_alloc_matrix(
@@ -361,7 +357,7 @@ class AllocationStrategy:
         demand_mat: Dict[str, Dict[str, int]],
         assig_mat: Dict[str, Dict[str, Dict[str, float]]],
         infr: Infrastructure,
-    ) -> Dict[str, Dict[str, Dict[str, float]]]:
+    ) -> Dict[str, Dict[str, float]]:
         """Calculates the service-server CPU allocation matrix that represents
             the computing resource allocation.
 
@@ -379,8 +375,7 @@ class AllocationStrategy:
         def calculate_dst_workload(demand_mat, assig_mat, dst):
             return sum(
                 self._req_to_ops(
-                    assig_mat[src][serv.name][dst.name]
-                    * demand_mat[src][serv.name],
+                    assig_mat[src][serv.name][dst.name] * demand_mat[src][serv.name],
                     serv,
                 )
                 for src in infr.bss
@@ -389,8 +384,7 @@ class AllocationStrategy:
 
         def get_total_req(demand_mat, assig_mat, service, dst):
             return sum(
-                assig_mat[b][service.name][dst.name]
-                * demand_mat[b][service.name]
+                assig_mat[b][service.name][dst.name] * demand_mat[b][service.name]
                 for b in infr.bss
             )
 
@@ -401,7 +395,9 @@ class AllocationStrategy:
                 if assignation_matrix[bsi][service.name][dst.name] > 0
             )
 
-        alloc_mat = defaultdict(lambda: defaultdict(float))
+        alloc_mat = defaultdict(
+            lambda: defaultdict(float)
+        )  # type: Dict[str, Dict[str, float]]
 
         for dst in infr.bss.values():
             if dst.server is None:
@@ -410,13 +406,13 @@ class AllocationStrategy:
             dst_workload = calculate_dst_workload(demand_mat, assig_mat, dst)
 
             if round(dst_workload) > dst.server.max_cap:
-                raise Exception(
+                raise MintEDGEAllocationError(
                     f"{dst_workload} exceeds {dst.name} capacity {dst.server.max_cap}."
                 )
 
             if dst_workload == 0:
                 continue
-
+            t = math.inf
             for serv in infr.services.values():
                 total_req = get_total_req(demand_mat, assig_mat, serv, dst)
 
@@ -427,7 +423,7 @@ class AllocationStrategy:
 
                 if alloc_mat[serv.name][dst.name] > 0:
                     max_trans_delay = get_max_trans_delay(assig_mat, serv, dst)
-                    t = serv.max_delay - max_trans_delay
+                    t = serv.max_delay - max_trans_delay  # type: float
 
                     # Adjust the allocation based on the maximum transport delay and service workload.
                     alloc_mat[serv.name][dst.name] = max(
@@ -464,10 +460,7 @@ class AllocationStrategy:
                 for serv in services:
                     min_alloc = serv.workload / (t * dst.server.max_cap)
                     diff = min_alloc - alloc_mat[serv.name][dst.name]
-                    if (
-                        alloc_mat[serv.name][dst.name] < min_alloc
-                        and diff < remaining
-                    ):
+                    if alloc_mat[serv.name][dst.name] < min_alloc and diff < remaining:
                         alloc_mat[serv.name][dst.name] += diff
                         remaining -= diff
                     elif alloc_mat[serv.name][dst.name] < min_alloc:
@@ -476,8 +469,6 @@ class AllocationStrategy:
 
                 if remaining > 0:
                     for serv in services:
-                        alloc_mat[serv.name][dst.name] += remaining / len(
-                            services
-                        )
+                        alloc_mat[serv.name][dst.name] += remaining / len(services)
 
         return alloc_mat

@@ -45,7 +45,7 @@ class IdealPredictor:
                     continue
                 for serv in settings.SERVICES:
                     # TODO: This works only if all users use all services
-                    max_demand[bs.name][serv.name] += serv.arrival_rate
+                    max_demand[bs.name][serv.name] += serv.arrival_rate  # type: ignore
             for bs, serv in itertools.product(bss, services):
                 max_demand[bs][serv] = max(max_demand[bs][serv], new_demand[bs][serv])
 

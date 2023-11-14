@@ -3,7 +3,9 @@ import multiprocessing
 from typing import Tuple
 
 import libsumo
-import simpy
+
+# import simpy
+from simpy.core import Environment
 from tqdm import tqdm
 
 import settings
@@ -41,8 +43,8 @@ class Location:
             + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
         )
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        distance = R * c * 1000  # convert to meters
-        return distance
+
+        return R * c * 1000  # convert to meters
 
     def __repr__(self):
         return f"Location({self.x}, {self.y})"
@@ -57,11 +59,11 @@ class Location:
 class MobilityManager:
     __slots__ = ["env", "running_users", "users_sliding_window"]
 
-    def __init__(self, env: simpy.Environment):
+    def __init__(self, env: Environment):
         """Class that manages the mobility of users.
 
         Args:
-            env (simpy.Environment): The simulation environment.
+            env (Environment): The simulation environment.
         """
         self.env = env
         self._launch_sumo()
@@ -105,34 +107,27 @@ class MobilityManager:
             ]
         )
 
-    def run(self, env: simpy.Environment, infr: "Infrastructure"):
+    def run(self, env: Environment, infr: "Infrastructure"):
         """Starts the mobility manager process.
 
         Args:
-            env (simpy.Environment): Simulation environment.
+            env (Environment): Simulation environment.
         """
         while True:
             users = self._get_next_step()
             for user, loc in users.items():
-                if user not in self.running_users:
-                    if user.startswith("car"):
-                        env.process(
-                            Car(env, user, infr, self, loc, env.now).run(env)
-                        )
-                        self.running_users[user] = loc
-                    elif user.startswith("person"):
-                        env.process(
-                            Person(env, user, infr, self, loc, env.now).run(env)
-                        )
-                        self.running_users[user] = loc
-                    elif user.startswith("stationary"):
-                        env.process(
-                            Stationary(env, user, infr, self, loc, env.now).run(
-                                env
-                            )
-                        )
-                        self.running_users[user] = loc
-                else:
+                if user in self.running_users:
+                    self.running_users[user] = loc
+                elif user.startswith("car"):
+                    env.process(Car(env, user, infr, self, loc, env.now).run(env))
+                    self.running_users[user] = loc
+                elif user.startswith("person"):
+                    env.process(Person(env, user, infr, self, loc, env.now).run(env))
+                    self.running_users[user] = loc
+                elif user.startswith("stationary"):
+                    env.process(
+                        Stationary(env, user, infr, self, loc, env.now).run(env)
+                    )
                     self.running_users[user] = loc
             #
             dead = set(self.running_users.keys()) - set(users.keys())
@@ -165,9 +160,7 @@ class MobilityManager:
         return users
 
     def _initialize_sliding_window(self):
-        for _ in range(
-            0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP
-        ):
+        for _ in range(0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP):
             window_slot = {}
             for car in libsumo.vehicle.getIDList():
                 lon, lat = libsumo.vehicle.getPosition(car)
@@ -253,12 +246,12 @@ class RandomMobilityManager(MobilityManager):
             return max_users
 
         hour = time // 3600 % len(settings.USER_COUNT_DISTRIBUTION)
-        min = time // 60 % 60
+        minim = time // 60 % 60
         user_dist = settings.USER_COUNT_DISTRIBUTION[int(hour)]
         user_dist_next = settings.USER_COUNT_DISTRIBUTION[int(hour + 1)]
         # users (dis)appear little by little not all of a sudden
         decay_factor = (user_dist - user_dist_next) / 60
-        avg_user_count = (user_dist - decay_factor * min) * max_users
+        avg_user_count = (user_dist - decay_factor * minim) * max_users
 
         return int(avg_user_count)
 
@@ -269,7 +262,7 @@ class RandomMobilityManager(MobilityManager):
             cars_to_add = cars - libsumo.vehicle.getIDCount()
             for _ in range(cars_to_add):
                 self._create_random_car(
-                    self.env.now + len(self.users_sliding_window)
+                    int(self.env.now) + len(self.users_sliding_window)
                 )
         # Check the number of people and create more if necessary
         people = self._get_user_count(self.env.now, settings.NUMBER_OF_PEOPLE)
@@ -277,7 +270,7 @@ class RandomMobilityManager(MobilityManager):
             people_to_add = people - libsumo.person.getIDCount()
             for _ in range(people_to_add):
                 self._create_random_person(
-                    self.env.now + len(self.users_sliding_window)
+                    int(self.env.now) + len(self.users_sliding_window)
                 )
 
         window_slot = {}
@@ -297,7 +290,7 @@ class RandomMobilityManager(MobilityManager):
     def _get_random_edge(self) -> str:
         from mintedge import RAND_NUM_GEN as random
 
-        return random.choice(libsumo.edge.getIDList())
+        return random.choice(libsumo.edge.getIDList())  # type: ignore
 
     def _create_random_car(self, depart: int):
         """Creates a random car that departs at the given time.
@@ -307,10 +300,10 @@ class RandomMobilityManager(MobilityManager):
         """
         time = libsumo.simulation.getTime()
         count = len(libsumo.simulation.getLoadedIDList())
-        id = str(int(time)) + "_" + str(count)
+        iden = f"{int(time)}_{count}"
         _, stage, _ = self._get_random_stage(depart)
-        libsumo.route.add(routeID=f"route_{id}", edges=stage.edges)
-        libsumo.vehicle.add(vehID=f"car_{id}", routeID=f"route_{id}")
+        libsumo.route.add(routeID=f"route_{iden}", edges=stage.edges)
+        libsumo.vehicle.add(vehID=f"car_{iden}", routeID=f"route_{iden}")
 
     def _create_random_person(self, depart: int):
         """Creates a random person that departs at the given time.
@@ -320,38 +313,36 @@ class RandomMobilityManager(MobilityManager):
         """
         time = libsumo.simulation.getTime()
         count = len(libsumo.simulation.getLoadedIDList())
-        id = str(int(time)) + "_" + str(count)
+        iden = f"{int(time)}_{count}"
         src_edge, stage, _ = self._get_random_stage(depart)
 
         libsumo.person.add(
-            personID=f"person_{id}", edgeID=src_edge, pos=0, depart=depart
+            personID=f"person_{iden}", edgeID=src_edge, pos=0, depart=depart
         )
         try:
             libsumo.person.appendWalkingStage(
-                personID=f"person_{id}", edges=stage.edges, arrivalPos=-1
+                personID=f"person_{iden}", edges=stage.edges, arrivalPos=-1
             )
         except libsumo.libsumo.TraCIException:
-            libsumo.person.remove(f"person_{id}")
+            libsumo.person.remove(f"person_{iden}")
             return
 
     def _get_random_position(self) -> Location:
         from mintedge import RAND_NUM_GEN as random
 
         edge = self._get_random_edge()
-        shape = libsumo.lane.getShape(edge + "_0")
-        lon, lat = random.choice(shape)
+        shape = libsumo.lane.getShape(f"{edge}_0")
+        lon, lat = random.choice(shape)  # type: ignore
         # UTM to WGS84
         lon, lat = libsumo.simulation.convertGeo(lon, lat)
         return Location(lon, lat)
 
-    def _get_random_stage(self, depart: int) -> "Stage":
+    def _get_random_stage(self, depart: int):
         while True:
             dst_edge = self._get_random_edge()
             src_edge = self._get_random_edge()
             libsumo.edge.setAllowed(src_edge, "all")
-            stage = libsumo.simulation.findRoute(
-                src_edge, dst_edge, depart=depart
-            )
+            stage = libsumo.simulation.findRoute(src_edge, dst_edge, depart=depart)
             if stage.edges:
                 break
         return src_edge, stage, dst_edge
@@ -364,16 +355,12 @@ class RandomMobilityManager(MobilityManager):
 
         # Create random routes and people
         people = self._get_user_count(self.env.now, settings.NUMBER_OF_PEOPLE)
-        for _ in tqdm(
-            range(people), leave=False, desc="Creating random people"
-        ):
+        for _ in tqdm(range(people), leave=False, desc="Creating random people"):
             self._create_random_person(0)
 
         # Create stationary users
 
-        for _ in range(
-            0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP
-        ):
+        for _ in range(0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP):
             window_slot = {}
             window_slot = self._get_slot_cars(window_slot)
             window_slot = self._get_slot_people(window_slot)

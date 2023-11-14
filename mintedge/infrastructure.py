@@ -17,6 +17,12 @@ from mintedge import (
 )
 
 
+class MintEDGEInfrastructureError(Exception):
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+
+
 class EdgeServer(EnergyAware):
     __slots__ = [
         "env",
@@ -202,6 +208,11 @@ class EdgeServer(EnergyAware):
             req (int): Number of requests made by the base station
         """
 
+        if req < 0:
+            raise MintEDGEInfrastructureError(
+                "Cannot allocate resources for negative number of requests."
+            )
+
         try:
             self.allocated_ops_bs_a[src.name][a.name] = math.floor(req * a.workload)
         except KeyError:
@@ -218,13 +229,8 @@ class EdgeServer(EnergyAware):
             sum(a.values()) for a in self.allocated_ops_bs_a.values()
         )
         if math.floor(req * a.workload) > self.max_cap:
-            raise Exception(
+            raise MintEDGEInfrastructureError(
                 f"Cannot allocate {math.floor(req * a.workload)} requests on server {self.name} for {src.name},{a.name}."
-            )
-
-        if req < 0:
-            raise Exception(
-                f"Cannot allocate resources for negative number of requests."
             )
 
 
@@ -334,7 +340,7 @@ class Link(EnergyAware):
         """
         new_capacity = self.used_capacity + bps
         if new_capacity > self.capacity:
-            raise Exception(
+            raise MintEDGEInfrastructureError(
                 f"Link {self.src.name},{self.dst.name} capacity exceeded by {new_capacity - self.capacity}."
             )
         self.used_capacity += bps
@@ -347,7 +353,7 @@ class Link(EnergyAware):
         """
         new_capacity = self.used_capacity - bps
         if new_capacity < 0:
-            raise Exception(
+            raise MintEDGEInfrastructureError(
                 f"Trying to release {bps} but only {self.used_capacity} is in use."
             )
         self.used_capacity -= bps
@@ -360,7 +366,7 @@ class Link(EnergyAware):
         """
         new_capacity = self.allocated_capacity + bps
         if new_capacity > self.capacity:
-            raise Exception(
+            raise MintEDGEInfrastructureError(
                 f"Link {self.src.name},{self.dst.name} capacity exceeded. Capacity:{self.capacity}, Allocated:{self.allocated_capacity}, Requested:{bps}"
             )
         self.allocated_capacity = bps
@@ -371,9 +377,7 @@ class Link(EnergyAware):
         Args:
             bps (int): The capacity to be allocated in bps.
         """
-        if self.used_capacity + bps > self.capacity:
-            return False
-        return True
+        return self.used_capacity + bps <= self.capacity
 
     def __repr__(self):
         return f"({self.src.name},{self.dst.name})"
@@ -474,7 +478,7 @@ class Infrastructure:
         Returns:
             True if the server is isolated, False otherwise.
         """
-        return len(list(self.nxgraph.neighbors(bs))) == 0
+        return not list(self.nxgraph.neighbors(bs))
 
     def get_path_sigma(self, path: List[Link]) -> float:
         """Returns the total energy consumed by each bit transmitted through
@@ -621,14 +625,10 @@ class Infrastructure:
             Tuple[int, int]: Number of requests attended and
                 number of rejected requests.
         """
-        # Reject requests if they do not fit in the server
-        rejected_s = 0
         avail_cap = self.bss[dst].server.get_avail_cap_bs_serv(src, self.services[serv])
         fitting_req = math.floor(avail_cap / self.services[serv].workload)
 
-        if fitting_req < total_req:
-            rejected_s = total_req - fitting_req
-
+        rejected_s = total_req - fitting_req if fitting_req < total_req else 0
         # Reject requests if they do not fit in the backhaul
         rejected_l = 0
         if dst != src.name:
@@ -676,9 +676,9 @@ class Infrastructure:
 
         if delay > self.services[a].max_delay:
             try:
-                self.kpis[self.env.now]["unsatisf_req_" + a] += req
+                self.kpis[self.env.now][f"unsatisf_req_{a}"] += req
             except KeyError:
-                self.kpis[self.env.now]["unsatisf_req_" + a] = req
+                self.kpis[self.env.now][f"unsatisf_req_{a}"] = req
         try:
             if delay > self.kpis[f"max_delay_{src.name}_{a}"]:
                 self.kpis[self.env.now][f"max_delay_{src.name}_{a}"] = delay
@@ -789,15 +789,15 @@ class Infrastructure:
         """
         if self.bss[dst].server is not None:
             try:
-                self.kpis[env.now]["server_util_" + dst] = round(
+                self.kpis[env.now][f"server_util_{dst}"] = round(
                     max(
                         self.bss[dst].server.get_utilization(),
-                        self.kpis[env.now]["server_util_" + dst],
+                        self.kpis[env.now][f"server_util_{dst}"],
                     ),
                     4,
                 )
             except KeyError:
-                self.kpis[env.now]["server_util_" + dst] = round(
+                self.kpis[env.now][f"server_util_{dst}"] = round(
                     self.bss[dst].server.get_utilization(), 4
                 )
 

@@ -1,4 +1,5 @@
 import atexit
+import contextlib
 import itertools
 import os
 import shutil
@@ -55,7 +56,7 @@ class Simulation:
         self._set_seed(seed)
         self.output_file = output_file
         self._check_settings()
-        try:
+        with contextlib.suppress(AttributeError):
             if (
                 settings.NORTH is not None
                 and settings.SOUTH is not None
@@ -65,8 +66,6 @@ class Simulation:
                 self.create_sumo_net(
                     settings.NORTH, settings.SOUTH, settings.EAST, settings.WEST
                 )
-        except AttributeError:
-            pass
 
     def run(self):
         """
@@ -176,20 +175,19 @@ class Simulation:
         print("Downloading map from OSM, this may take a while...")
         response = requests.get(url)
 
-        if response.status_code == 200:
-            # Write the response content to the temporary file
-            with tempfile.NamedTemporaryFile(
-                dir=temp_dir, suffix=".osm.xml", delete=False
-            ) as temp_file:
-                temp_file.write(response.content)
-
-                # Convert the OSM file to a SUMO network file
-                call = f"netconvert --osm-files {temp_file.name} -o {output_file_path} --no-warnings --ignore-errors --remove-edges.isolated --remove-edges.by-type railway.rail,railway.tram,railway.light_rail,railway.subway,railway.preserved,highway.pedestrian,highway.cycleway,highway.footway,highway.bridleway,highway.steps,highway.step,highway.stairs --ramps.guess --junctions.join --tls.join --no-internal-links --no-turnarounds --roundabouts.guess --offset.disable-normalization --output.original-names"
-                os.system(call)
-        else:
+        if response.status_code != 200:
             raise MintEDGEError(
                 f"Failed to download file. HTTP status code: {response.status_code}"
             )
+        # Write the response content to the temporary file
+        with tempfile.NamedTemporaryFile(
+            dir=temp_dir, suffix=".osm.xml", delete=False
+        ) as temp_file:
+            temp_file.write(response.content)
+
+            # Convert the OSM file to a SUMO network file
+            call = f"netconvert --osm-files {temp_file.name} -o {output_file_path} --no-warnings --ignore-errors --remove-edges.isolated --remove-edges.by-type railway.rail,railway.tram,railway.light_rail,railway.subway,railway.preserved,highway.pedestrian,highway.cycleway,highway.footway,highway.bridleway,highway.steps,highway.step,highway.stairs --ramps.guess --junctions.join --tls.join --no-internal-links --no-turnarounds --roundabouts.guess --offset.disable-normalization --output.original-names"
+            os.system(call)
         settings.NET_FILE = output_file_path
 
     def _filter_infrastructure(self, df_bss, df_links):
@@ -238,7 +236,7 @@ class Simulation:
                         )
 
         closest_node1, closest_node2, min_dist = None, None, float("inf")
-        for node1, node2 in itertools.product(closest_comp1, closest_comp2):
+        for node1, node2 in itertools.product(closest_comp1, closest_comp2):  # type: ignore
             distance = node1.location.distance(node2.location)
             if distance < min_dist:
                 closest_node1, closest_node2, min_dist = (
@@ -321,9 +319,7 @@ class Simulation:
 
         for i, row in tqdm(df.iterrows(), desc="Adding base stations", leave=False):
             location = mintedge.Location(row["lon"], row["lat"])
-            infr.add_base_station(
-                "BS" + str(i), settings.BS_DATARATE, None, location
-            )  # Servers (None) added later
+            infr.add_base_station(f"BS{str(i)}", settings.BS_DATARATE, None, location)  # type: ignore
 
         print("Number of base stations imported: ", len(infr.bss))
         link_dict = {}
@@ -403,11 +399,11 @@ class Simulation:
                 raise MintEDGESettingsError(
                     "Either NET_FILE or all bounds (NORTH, SOUTH, EAST, WEST) must be set"
                 )
-        except AttributeError:
+        except AttributeError as e:
             if settings.NET_FILE is None:
                 raise MintEDGESettingsError(
                     "Either NET_FILE or all bounds (NORTH, SOUTH, EAST, WEST) must be set"
-                )
+                ) from e
 
         # Ensure compulsory settings are set
         if settings.BS_DATARATE is None:

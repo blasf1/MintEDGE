@@ -1,3 +1,4 @@
+import contextlib
 import itertools
 import math
 import statistics as stats
@@ -143,15 +144,13 @@ class Orchestrator:
                     self.latest_kpis["total_rejected"].iloc[-1]
                     / self.latest_kpis["total_requests"].iloc[-1]
                 )
-            if (
-                settings.REACTIVE_ALLOCATION
-                and share_of_rejections > settings.REACTION_THRESHOLD
-            ):
-                return True
-            else:
-                return False
+            return bool(
+                (
+                    settings.REACTIVE_ALLOCATION
+                    and share_of_rejections > settings.REACTION_THRESHOLD
+                )
+            )
         except IndexError:
-            print("Couldn't check if reaction is needed")
             return False
 
     def _apply_capacity_buffer(self, demand_mat: Dict[str, Dict[str, int]]):
@@ -321,7 +320,7 @@ class Orchestrator:
             k: 0 for k in self.kpis.columns
         }  # type: Dict[str, Optional[Union[int, float, None]]]
 
-        new_data["time"] = int(time)
+        new_data["time"] = time
 
         # Get KPIs from mobility manager
         new_data["active_users"] = self.mobility_manager.get_running_user_count()
@@ -332,7 +331,7 @@ class Orchestrator:
         new_data["W_links"] = round(self.em_links.measurmnts[-1].dynamic, 3)
 
         # Get KPIs from infrastructure
-        try:
+        with contextlib.suppress(IndexError):
             k, v = list(self.infr.kpis.items())[-1]
             for k, v in v.items():
                 if isinstance(v, list):
@@ -343,9 +342,6 @@ class Orchestrator:
                         new_data[k] = 0
                 else:
                     new_data[k] = None if math.isinf(v) else v
-        except IndexError:
-            pass
-
         # Transform dictionary to dataframe and append it to the measurements
         new_row = pd.DataFrame.from_dict(
             new_data, orient="index", columns=[str(self.env.now)]
@@ -372,16 +368,14 @@ class Orchestrator:
         """
         bss = self.infr.bss
         servcs = self.infr.services
-        gamma = {bsi: {ak: {bsj: 0.0 for bsj in bss} for ak in servcs} for bsi in bss}
-        return gamma
+        return {bsi: {ak: {bsj: 0.0 for bsj in bss} for ak in servcs} for bsi in bss}
 
     def initialize_status_vector(self) -> Dict[str, int]:
         """Initialize the eta matrix
         Returns:
             Dict[str, int]: The initialized eta vector
         """
-        eta = {}
-        return eta
+        return {}
 
     def initialize_allocation_matrix(self) -> Dict[str, Dict[str, float]]:
         """Initialize the beta matrix to 0
@@ -390,9 +384,7 @@ class Orchestrator:
         """
         bss = self.infr.bss
         servcs = self.infr.services
-        beta = {ak: {bsj: 0.0 for bsj in bss} for ak in servcs}
-
-        return beta
+        return {ak: {bsj: 0.0 for bsj in bss} for ak in servcs}
 
     def initialize_demand_matrix(self) -> Dict[str, Dict[str, int]]:
         """Initialize the lmbda matrix to 0

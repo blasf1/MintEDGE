@@ -24,8 +24,9 @@ SOFTWARE."""
 from abc import ABC, abstractmethod
 from functools import reduce
 from typing import Union, Collection, Callable, Optional, Iterable
-import simpy
 
+# import simpy
+from simpy.core import Environment
 
 _unnamed_energy_meters_created = 0
 
@@ -66,10 +67,7 @@ class EnergyMeasurement:
         )
 
     def __radd__(self, other):  # Required for sum()
-        if other == 0:
-            return self
-        else:
-            return self.__add__(other)
+        return self if other == 0 else self.__add__(other)
 
     def __sub__(self, other):
         return EnergyMeasurement(
@@ -77,9 +75,7 @@ class EnergyMeasurement:
         )
 
     def multiply(self, factor: float):
-        return EnergyMeasurement(
-            dynamic=self.dynamic * factor, idle=self.idle * factor
-        )
+        return EnergyMeasurement(dynamic=self.dynamic * factor, idle=self.idle * factor)
 
     def total(self) -> float:
         return float(self)
@@ -110,22 +106,16 @@ class EnergyModelServer(EnergyModel):
         pass
 
     def measure(self) -> EnergyMeasurement:
-        if (
-            self.server.env.now
-            < self.server.last_onoff_time + self.server.boot_time
-        ):
+        if self.server.env.now < self.server.last_onoff_time + self.server.boot_time:
             return EnergyMeasurement(
                 dynamic=self.server.max_power, idle=self.server.idle_power
             )
         if not self.server.is_on:
             return EnergyMeasurement(dynamic=0, idle=0)
         dynamic_power = (
-            (self.server.max_power - self.server.idle_power)
-            / self.server.max_cap
+            (self.server.max_power - self.server.idle_power) / self.server.max_cap
         ) * self.server.used_ops
-        return EnergyMeasurement(
-            dynamic=dynamic_power, idle=self.server.idle_power
-        )
+        return EnergyMeasurement(dynamic=dynamic_power, idle=self.server.idle_power)
 
     def set_parent(self, parent):
         self.server = parent
@@ -188,11 +178,11 @@ class EnergyMeter:
         self.callback = callback
         self.measurmnts = []
 
-    def run(self, env: simpy.Environment):
+    def run(self, env: Environment):
         """Starts the energy meter process
 
         Args:
-            env (simpy.Environment): Simpy environment
+            env (Environment): Simpy environment
         """
         while True:
             yield env.timeout(self.measurement_interval)

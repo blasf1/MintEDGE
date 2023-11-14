@@ -15,5 +15,5 @@ from .orchestrator import Orchestrator
 from .simulation import Simulation
 
 SEED = 0
-RAND_NUM_GEN = None
-SIMULATION_TIME = None
+RAND_NUM_GEN = None  # type: ignore
+SIMULATION_TIME = None  # type: ignore

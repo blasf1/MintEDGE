@@ -68,14 +68,10 @@ class Orchestrator:
         self.em_servers = EnergyMeter(
             [bs.server for bs in infr.bss.values() if bs.server is not None],
             "servers",
-            settings.ENERGY_MEASUREMENT_INTERVAL,
+            settings.MEASUREMENT_INTERVAL,
         )
 
-        self.em_links = EnergyMeter(
-            infr.links,
-            "links",
-            settings.ENERGY_MEASUREMENT_INTERVAL,
-        )
+        self.em_links = EnergyMeter(infr.links, "links", settings.MEASUREMENT_INTERVAL)
 
         # Run energy meters processes
         env.process(self.em_servers.run(env))
@@ -292,14 +288,14 @@ class Orchestrator:
         if len(self.kpis) >= settings.ORCHESTRATOR_INTERVAL:
             # Save to file
             if self.results_path.exists():
-                self.kpis.to_parquet(
+                self.kpis.to_csv(
                     self.results_path,
                     index=False,
-                    engine="fastparquet",
-                    append=True,
+                    mode="a",
+                    header=False,
                 )
             else:
-                self.kpis.to_parquet(self.results_path, engine="fastparquet")
+                self.kpis.to_csv(self.results_path, index=False)
             # Clean from memory
             self.kpis = self.kpis.drop(
                 self.kpis.index[: settings.ORCHESTRATOR_INTERVAL]

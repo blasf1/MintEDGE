@@ -5,8 +5,7 @@ from mintedge import Service
 
 """SIMULATION"""
 USE_PREDICTOR = False
-MOBILITY_STEP = 1  # seconds
-ENERGY_MEASUREMENT_INTERVAL = 1  # seconds
+MEASUREMENT_INTERVAL = 1  # seconds
 ORCHESTRATOR_INTERVAL = 60  # how often the orchestrator updates the allocation
 CAPACITY_BUFFER = 0.2  # [0, 1] share of extra capacity to allocate
 REACTIVE_ALLOCATION = False  # whether to allocate resources reactively when more than a threshold of requests are rejected
@@ -102,9 +101,9 @@ SERVICES = [
     # name, workload(ops/s), lambda(req/s), vin(bytes), vout(bytes), delay_budget(seconds)
     #
     # CONNECTED VEHICLES
-    Service("connected_vehicles", 14e3, 10, 1600, 100, 5e-3),
+    Service("connected_vehicles", 14000, 10, 1600, 100, 5e-3),
     # AUGMENTED REALITY
-    Service("augmented_reality", 50e3, 0.5, 1500 * 1024, 25 * 1024, 15e-3),
+    Service("augmented_reality", 50000, 0.5, 1500 * 1024, 25 * 1024, 15e-3),
     # VIDEO ANALYSIS
-    Service("video_analysis", 30e3, 6, 1500 * 1024, 20, 30e-3),
+    Service("video_analysis", 30000, 6, 1500 * 1024, 20, 30e-3),
 ]

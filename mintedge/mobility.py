@@ -98,8 +98,8 @@ class MobilityManager:
                 str(multiprocessing.cpu_count()),
                 "--device.rerouting.threads",
                 str(multiprocessing.cpu_count()),
-                "--step-length",
-                str(settings.MOBILITY_STEP),
+                # "--step-length",
+                # str(settings.MOBILITY_STEP),
                 "--step-method.ballistic",
                 "--random",
             ]
@@ -131,7 +131,7 @@ class MobilityManager:
             dead = set(self.running_users.keys()) - set(users.keys())
             for d in dead:
                 del self.running_users[d]
-            yield env.timeout(settings.MOBILITY_STEP)
+            yield env.timeout(1)
 
     # SUMO traces do not have stationary users
     def _get_next_step(self):
@@ -158,7 +158,7 @@ class MobilityManager:
         return users
 
     def _initialize_sliding_window(self):
-        for _ in range(0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP):
+        for _ in range(settings.ORCHESTRATOR_INTERVAL):
             window_slot = {}
             for car in libsumo.vehicle.getIDList():
                 lon, lat = libsumo.vehicle.getPosition(car)
@@ -219,8 +219,8 @@ class RandomMobilityManager(MobilityManager):
                 str(multiprocessing.cpu_count()),
                 "--device.rerouting.threads",
                 str(multiprocessing.cpu_count()),
-                "--step-length",
-                str(settings.MOBILITY_STEP),
+                # "--step-length",
+                # str(settings.MOBILITY_STEP),
                 "--step-method.ballistic",
                 "--random",
             ]
@@ -358,7 +358,7 @@ class RandomMobilityManager(MobilityManager):
 
         # Create stationary users
 
-        for _ in range(0, settings.ORCHESTRATOR_INTERVAL, settings.MOBILITY_STEP):
+        for _ in range(settings.ORCHESTRATOR_INTERVAL):
             window_slot = {}
             window_slot = self._get_slot_cars(window_slot)
             window_slot = self._get_slot_people(window_slot)

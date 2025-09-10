@@ -98,8 +98,6 @@ class MobilityManager:
                 str(multiprocessing.cpu_count()),
                 "--device.rerouting.threads",
                 str(multiprocessing.cpu_count()),
-                # "--step-length",
-                # str(settings.MOBILITY_STEP),
                 "--step-method.ballistic",
                 "--random",
             ]
@@ -158,6 +156,9 @@ class MobilityManager:
         return users
 
     def _initialize_sliding_window(self):
+        """
+        Initializes the sliding window with the first positions of all users.
+        """
         for _ in range(settings.ORCHESTRATOR_INTERVAL):
             window_slot = {}
             for car in libsumo.vehicle.getIDList():
@@ -254,6 +255,13 @@ class RandomMobilityManager(MobilityManager):
         return int(avg_user_count)
 
     def _get_next_step(self):
+        """ "
+        Returns the next step of the sliding window. It also creates or removes
+        users if necessary.
+
+        Returns:
+            dict: Dictionary with the user IDs as keys and their locations as values.
+        """
         # Check the number of cars and create more if necessary
         cars = self._get_user_count(self.env.now, settings.NUMBER_OF_CARS)
         if cars > libsumo.vehicle.getIDCount():
@@ -326,6 +334,11 @@ class RandomMobilityManager(MobilityManager):
             return
 
     def _get_random_position(self) -> Location:
+        """Returns a random position in the map.
+
+        Returns:
+            Location: Random position.
+        """
         from mintedge import RAND_NUM_GEN as random
 
         edge = self._get_random_edge()

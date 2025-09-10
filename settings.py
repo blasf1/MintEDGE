@@ -14,18 +14,23 @@ REACTION_THRESHOLD = 0.1  # share of reqs rejected to trigger a new allocation
 """SCENARIO"""
 PLOT_SCENARIO = True
 
+API_MIRRORS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+]
+
 # Some examples of coordinates
 # Twente's coordinates
 # NORTH, SOUTH, EAST, WEST = 52.4914, 52.1175, 7.0827, 6.3264
 
 # Enschede + Hengelo's coordinates
-# NORTH, SOUTH, EAST, WEST = 52.2978, 52.1796, 6.9519, 6.7456
+NORTH, SOUTH, EAST, WEST = 52.2978, 52.1796, 6.9519, 6.7456
 
 # Elburg's coordinates
 # NORTH, SOUTH, EAST, WEST = 52.4788, 52.3525, 5.9268, 5.7536
 
 # Maastrichts's coordinates
-NORTH, SOUTH, EAST, WEST = 50.8695, 50.8303, 5.7417, 5.6415
+# NORTH, SOUTH, EAST, WEST = 50.8695, 50.8303, 5.7417, 5.6415
 
 # Luxembourg's state coordinates
 # NORTH, SOUTH, EAST, WEST = 50.1848, 49.4457, 6.5341, 5.7307

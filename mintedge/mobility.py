@@ -75,6 +75,9 @@ class MobilityManager:
         libsumo.close()
 
     def _launch_sumo(self):
+        """
+        Launches the SUMO simulator with the given configuration.
+        """
         # Leverage sumo for mobility
         from mintedge import SIMULATION_TIME as sim_time
 
@@ -133,6 +136,10 @@ class MobilityManager:
 
     # SUMO traces do not have stationary users
     def _get_next_step(self):
+        """Returns the next step of the sliding window.
+        Returns:
+            dict: Dictionary with the user IDs as keys and their locations as values.
+        """
         window_slot = {}
         for car in libsumo.vehicle.getIDList():
             lon, lat = libsumo.vehicle.getPosition(car)
@@ -294,6 +301,10 @@ class RandomMobilityManager(MobilityManager):
         return users
 
     def _get_random_edge(self) -> str:
+        """Returns a random edge in the map.
+        Returns:
+            str: Random edge ID.
+        """
         from mintedge import RAND_NUM_GEN as random
 
         return random.choice(libsumo.edge.getIDList())  # type: ignore
@@ -349,6 +360,12 @@ class RandomMobilityManager(MobilityManager):
         return Location(lon, lat)
 
     def _get_random_stage(self, depart: int):
+        """Returns a random stage in the map.
+        Args:
+            depart (int): Departure time
+        Returns:
+            str, libsumo.TraCIStage, str: Source edge ID, stage, destination edge ID.
+        """
         while True:
             dst_edge = self._get_random_edge()
             src_edge = self._get_random_edge()
@@ -359,6 +376,7 @@ class RandomMobilityManager(MobilityManager):
         return src_edge, stage, dst_edge
 
     def _initialize_sliding_window(self):
+        """Initializes the sliding window with the first positions of all users."""
         # Create random routes and vehicles
         cars = self._get_user_count(self.env.now, settings.NUMBER_OF_CARS)
         for _ in tqdm(range(cars), leave=False, desc="Creating random cars"):
@@ -381,6 +399,11 @@ class RandomMobilityManager(MobilityManager):
             libsumo.simulationStep()
 
     def _get_slot_cars(self, window_slot):
+        """
+        Get the positions of cars.
+        Args:
+            window_slot (dict): The current window slot with user positions.
+        """
         for car in libsumo.vehicle.getIDList():
             lon, lat = libsumo.vehicle.getPosition(car)
             # UTM to WGS84
@@ -389,6 +412,11 @@ class RandomMobilityManager(MobilityManager):
         return window_slot
 
     def _get_slot_people(self, window_slot):
+        """
+        Get the positions of people.
+        Args:
+            window_slot (dict): The current window slot with user positions.
+        """
         for person in libsumo.person.getIDList():
             lon, lat = libsumo.person.getPosition(person)
             # UTM to WGS84
@@ -397,6 +425,11 @@ class RandomMobilityManager(MobilityManager):
         return window_slot
 
     def _get_slot_stationary(self, window_slot):
+        """
+        Get the positions of stationary users.
+        Args:
+            window_slot (dict): The current window slot with user positions.
+        """
         if len(self.users_sliding_window) == 0:
             for id in range(settings.NUMBER_OF_STATIONARY):
                 window_slot[f"stationary_{id}"] = self._get_random_position()

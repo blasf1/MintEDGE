@@ -1,7 +1,6 @@
 # MintEDGE
 
 ![Python](https://img.shields.io/badge/Python-3670A0?style=flat&logo=python&logoColor=ffdd54)
-![Linux](https://img.shields.io/badge/Linux-E95420?style=flat&logo=linux&logoColor=FFFFFF)
 ![GitHub](https://img.shields.io/github/license/blasf1/MintEDGE)
 ![GitHub repo size](https://img.shields.io/github/repo-size/blasf1/MintEDGE)
 

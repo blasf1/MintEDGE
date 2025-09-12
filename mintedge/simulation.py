@@ -102,13 +102,31 @@ class Simulation:
             env.run(until=until)
 
     def _set_seed(self, seed):
+        """
+        Set the random seed for the simulation.
+        Args:
+            seed (int): The random seed to use.
+        """
         mintedge.SEED = seed
         mintedge.RAND_NUM_GEN = np.random.default_rng(seed=seed)
 
     def _set_simulation_time(self, sim_time):
+        """
+        Set the simulation time for the simulation.
+        Args:
+            sim_time (int): The duration of the simulation in seconds.
+        """
         mintedge.SIMULATION_TIME = sim_time
 
     def plot_scenario(self, infr):
+        """
+        Plot the network graph with base stations and servers.
+        Base stations are shown in red, and those with servers are shown in blue.
+        The network roads are shown in black.
+        Args:
+            infr (mintedge.Infrastructure): The infrastructure object containing the graph.
+        """
+
         def plot_roads(net, ax):
             from matplotlib.collections import LineCollection
 
@@ -243,7 +261,6 @@ class Simulation:
             "--junctions.join",
             "--tls.join",
             "--no-internal-links",
-            "--geometry.clipping",
             "--no-turnarounds",
             "--roundabouts.guess",
             "--offset.disable-normalization",
@@ -256,6 +273,14 @@ class Simulation:
         settings.NET_FILE = net_xml
 
     def _filter_infrastructure(self, df_bss, df_links):
+        """
+        Filter the base stations and links based on the map boundaries and provider.
+        Args:
+            df_bss (pd.DataFrame): DataFrame containing base station information.
+            df_links (pd.DataFrame): DataFrame containing link information.
+        Returns:
+            pd.DataFrame, pd.DataFrame: Filtered DataFrames for base stations and links.
+        """
         (w, s), (e, n) = libsumo.simulation.getNetBoundary()
         w, s = libsumo.simulation.convertGeo(w, s)
         e, n = libsumo.simulation.convertGeo(e, n)
@@ -277,6 +302,15 @@ class Simulation:
         return df_bss, df_links
 
     def make_connected(self, infr):
+        """
+        Ensure the infrastructure graph is fully connected by adding links between
+        the closest nodes of disconnected components.
+        Args:
+            infr (mintedge.Infrastructure): The infrastructure object containing the graph.
+        Returns:
+            mintedge.Infrastructure: The modified infrastructure with a connected graph.
+        """
+
         G = infr.nxgraph
 
         # Create a list of connected components in the graph
@@ -321,6 +355,15 @@ class Simulation:
         return self.make_connected(infr)
 
     def deterministic_server_placement(self, env, infr, k):
+        """
+        Place edge servers on the k most central nodes in the infrastructure graph.
+        Args:
+            env (simpy.Environment): The simulation environment.
+            infr (mintedge.Infrastructure): The infrastructure object containing the graph.
+            k (int): The number of servers to place.
+        Returns:
+            mintedge.Infrastructure: The modified infrastructure with servers placed.
+        """
         # Calculate the centrality of each node based on degree and location
         centrality = {}
         for node in infr.nxgraph.nodes:
@@ -365,6 +408,13 @@ class Simulation:
         return infr
 
     def create_infrastructure(self, env: Environment) -> mintedge.Infrastructure:
+        """
+        Create the infrastructure for the simulation.
+        Args:
+            env (simpy.Environment): The simulation environment.
+        Returns:
+            mintedge.Infrastructure: The created infrastructure.
+        """
         infr = mintedge.Infrastructure(env)
         # Add services
         for s in settings.SERVICES:
@@ -422,6 +472,9 @@ class Simulation:
         return infr
 
     def _check_settings(self):
+        """
+        Check the simulation settings for validity.
+        """
         # Check that there is a BSS file. Random BSSs is not yet supported
         if settings.BSS_FILE is None or not os.path.isfile(settings.BSS_FILE):
             raise MintEDGESettingsError("Currently, BSS_FILE must be set")

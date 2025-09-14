@@ -227,8 +227,6 @@ class RandomMobilityManager(MobilityManager):
                 str(multiprocessing.cpu_count()),
                 "--device.rerouting.threads",
                 str(multiprocessing.cpu_count()),
-                # "--step-length",
-                # str(settings.MOBILITY_STEP),
                 "--step-method.ballistic",
                 "--random",
             ]
@@ -254,7 +252,9 @@ class RandomMobilityManager(MobilityManager):
         hour = time // 3600 % len(settings.USER_COUNT_DISTRIBUTION)
         minim = time // 60 % 60
         user_dist = settings.USER_COUNT_DISTRIBUTION[int(hour)]
-        user_dist_next = settings.USER_COUNT_DISTRIBUTION[int(hour + 1)]
+        user_dist_next = settings.USER_COUNT_DISTRIBUTION[
+            int((hour + 1) % len(settings.USER_COUNT_DISTRIBUTION))
+        ]  # make it cyclic (makes sense for daily/hourly/weekly patterns)
         # users (dis)appear little by little not all of a sudden
         decay_factor = (user_dist - user_dist_next) / 60
         avg_user_count = (user_dist - decay_factor * minim) * max_users

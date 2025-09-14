@@ -5,7 +5,9 @@ import networkx as nx
 from simpy.core import Environment
 from simpy.events import Event
 from tqdm import tqdm
+from multipledispatch import dispatch
 
+import settings
 from mintedge import (
     EnergyAware,
     EnergyMeasurement,
@@ -260,6 +262,44 @@ class BaseStation:
     def __repr__(self):
         return self.name
 
+    def get_user_rate(self, user) -> float:
+        """Per-user PHY rate in bps based on distance (Shannon-like).
+        If no users are connected, returns the BS rate. Floors at 1 Mbps
+        to avoid zero. Uses a log-distance (dB) SNR model with reference
+        distance.
+        Args:
+            user (User): The user for whom the rate is being calculated.
+        Returns:
+            float: The rate for the user in bps.
+        """
+        if not self.users:
+            return self.rate
+
+        # Distance between the user and the BS
+        dist = self.location.distance(user.location)
+        d0 = 1.0  # reference distance in meters
+        dist = max(dist, d0)  # Clamp to 1 meter to avoid zero or negative
+
+        # Avoid division by zero
+        if dist == 0:
+            return self.rate
+
+        # SNR as a function of distance (free space path loss model); clamp to tiny positive
+        snr_db = settings.SNR0_DB - 10.0 * settings.PATHLOSS_EXPONENT * math.log10(
+            dist / d0
+        )
+
+        snr_linear = 10 ** (snr_db / 10.0)
+
+        # Shannon-like spectral efficiency
+        se_bps_per_hz = math.log2(1.0 + snr_linear)
+
+        # Raw capacity then cap & floor
+        raw_rate = settings.BS_BANDWIDTH * se_bps_per_hz  # bps
+
+        return max(raw_rate, settings.MIN_USER_RATE)
+
+    @dispatch(int)
     def get_delay(self, input_size: int) -> float:
         """Returns the RAN delay of a request made in this Base Station in
         milliseconds.
@@ -269,7 +309,20 @@ class BaseStation:
             float: The RAN delay of a request made in this Base Station in
                 seconds.
         """
-        return input_size / (self.rate * 1000 * 1000)
+        return input_size / self.rate
+
+    @dispatch(User, int)
+    def get_delay(self, user: User, input_size: int) -> float:
+        """Returns the RAN delay of a request made in this Base Station in
+        milliseconds.
+        Args:
+            user (User): The user for whom the delay is being calculated.
+            input_size (int): The size of the request in bits.
+        Return:
+            float: The RAN delay of a request made in this Base Station in
+                seconds.
+        """
+        return input_size / self.get_user_rate(user)
 
     def set_edge_server(self, edge_server: EdgeServer):
         """Sets the edge server connected to this BS.
@@ -659,8 +712,19 @@ class Infrastructure:
         if self.env.now not in self.kpis:
             self.kpis[self.env.now] = {}
         # Track delays
-        t_u = src.get_delay(self.services[a].input_size)  # RAN delay
-        # Backhaul delay
+        # t_u = src.get_delay(self.services[a].input_size)  # RAN delay
+        # --- Per-user RAN input delay (only users requesting service 'a') ---
+        active_users_src = [u for u in src.users if u.lmbda.get(a, 0) > 0]
+        if active_users_src:
+            per_user_delays = [
+                src.get_delay(u, self.services[a].input_size) for u in active_users_src
+            ]
+            t_u = sum(per_user_delays) / len(per_user_delays)
+        else:
+            # fallback if no user-specific info
+            t_u = src.get_delay(self.services[a].input_size)
+
+        # --- Backhaul delays ---
         if dst == src:
             t_r = 0
             t_o = 0
@@ -668,12 +732,24 @@ class Infrastructure:
             t_r = self.get_path_delay(src, dst, self.services[a])
             t_o = self.get_path_out_delay(dst, src, self.services[a])
 
-        t_c = dst.server.get_delay(
-            self.beta[a][dst.name], self.services[a]
-        )  # Compute delay
-        t_d = dst.get_delay(self.services[a].output_size)  # RAN output delay
-        delay = round(t_u + t_r + t_c + t_o + t_d, 5)
+        # --- Computing delay ---
+        t_c = dst.server.get_delay(self.beta[a][dst.name], self.services[a])
 
+        # t_d = dst.get_delay(self.services[a].output_size)  # RAN output delay
+        # --- Per-user RAN output delay (only users at dst requesting service 'a') ---
+        active_users_dst = [u for u in dst.users if u.lmbda.get(a, 0) > 0]
+        if active_users_dst:
+            per_user_out_delays = [
+                dst.get_delay(u, self.services[a].output_size) for u in active_users_dst
+            ]
+            t_d = sum(per_user_out_delays) / len(per_user_out_delays)
+        else:
+            t_d = dst.get_delay(self.services[a].output_size)
+
+        # --- Total delay ---
+        delay = round(t_u + t_r + t_c + t_o + t_d, 5)  # round to save storage space
+
+        # --- KPI registration ---
         if delay > self.services[a].max_delay:
             try:
                 self.kpis[self.env.now][f"unsatisf_req_{a}"] += req
@@ -771,14 +847,14 @@ class Infrastructure:
 
         src_a = f"{src}_{serv}"
         if f"rejected_req_{src_a}" in self.kpis[env.now]:
-            self.kpis[env.now][f"rejected_req_{src_a}"] += rej
+            self.kpis[env.now][f"rejected_req_{src_a}"] += int(rej)
         else:
-            self.kpis[env.now][f"rejected_req_{src_a}"] = rej
+            self.kpis[env.now][f"rejected_req_{src_a}"] = int(rej)
 
         if "total_rejected" in self.kpis[env.now]:
-            self.kpis[env.now]["total_rejected"] += rej
+            self.kpis[env.now]["total_rejected"] += int(rej)
         else:
-            self.kpis[env.now]["total_rejected"] = rej
+            self.kpis[env.now]["total_rejected"] = int(rej)
 
     def _register_server_utilization(self, env: Environment, dst: str):
         """Save the current server utilization in the KPIs dictionary.

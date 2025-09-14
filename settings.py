@@ -12,7 +12,7 @@ REACTIVE_ALLOCATION = False  # whether to allocate resources reactively when mor
 REACTION_THRESHOLD = 0.1  # share of reqs rejected to trigger a new allocation
 
 """SCENARIO"""
-PLOT_SCENARIO = True
+PLOT_SCENARIO = False
 
 API_MIRRORS = [
     "https://overpass-api.de/api/interpreter",
@@ -24,13 +24,13 @@ API_MIRRORS = [
 # NORTH, SOUTH, EAST, WEST = 52.4914, 52.1175, 7.0827, 6.3264
 
 # Enschede + Hengelo's coordinates
-NORTH, SOUTH, EAST, WEST = 52.2978, 52.1796, 6.9519, 6.7456
+# NORTH, SOUTH, EAST, WEST = 52.2978, 52.1796, 6.9519, 6.7456
 
 # Elburg's coordinates
 # NORTH, SOUTH, EAST, WEST = 52.4788, 52.3525, 5.9268, 5.7536
 
 # Maastrichts's coordinates
-# NORTH, SOUTH, EAST, WEST = 50.8695, 50.8303, 5.7417, 5.6415
+NORTH, SOUTH, EAST, WEST = 50.8695, 50.8303, 5.7417, 5.6415
 
 # Luxembourg's state coordinates
 # NORTH, SOUTH, EAST, WEST = 50.1848, 49.4457, 6.5341, 5.7307
@@ -50,7 +50,7 @@ ROUTES_FILE = "./scenario/Luxembourg.rou.xml"
 
 # The number of cars, pedestrians and stationary users is only considered if
 # RANDOM_ROUTES is True
-NUMBER_OF_CARS = 2000
+NUMBER_OF_CARS = 2500
 NUMBER_OF_PEOPLE = 500
 NUMBER_OF_STATIONARY = 100
 
@@ -63,13 +63,16 @@ USER_COUNT_DISTRIBUTION = [0.13, 0.1, 0.07, 0.04, 0.03, 0.02, 0.02, 0.03, 0.04, 
 
 """BASE STATION"""
 BS_BANDWIDTH = 100e6  # 100 MHz (METIS-II Table 3-9 UC5 (connected cars))
-BS_NOISE = 9  # 9 dB (METIS-II Table 3-9 UC5 (connected cars))
-BS_POWER = 49  # 49 dBm (METIS-II Table 3-9 UC5 (connected cars))
-# Shannon-Hartley theorem
-BS_DATARATE = BS_BANDWIDTH * np.log2(1 + BS_POWER / BS_NOISE)
+SNR0_DB = 55  # reference SNR at 1 meter (dB)
+SNR0_LIN = 10 ** (SNR0_DB / 10)  # linear SNR at 1 meter
+PATHLOSS_EXPONENT = 2.0  # free space
+MIN_USER_RATE = 1e6  # 1 Mbps
+# Shannon-Hartley theorem. This is the base datarate used for preallocations
+BS_DATARATE = BS_BANDWIDTH * np.log2(1.0 + SNR0_LIN)
+
 
 """BACKHAUL"""
-W_PER_BIT = 59e-9  # 59 nJ/bit
+W_PER_BIT = 5.9e-9  # 5.9 nJ/bit
 MAX_LINK_CAPACITY = 10e9  # 10 Gbps
 
 """EDGE SERVERS"""

@@ -260,11 +260,13 @@ class AllocationStrategy:
 
         # Get all paths from bsi to all other base stations.
         cand_paths = {k: v for k, v in self.infr.paths.items() if k[0] is src.name}
+        # Get the RAN delay
+        t_u = src.get_delay(serv.input_size)
         # Get BSs with a server and within the delay budget
         for path in cand_paths:
             dst = self.infr.bss[path[1]]
             if dst.server is not None and server_status[dst.name] == 1:
-                t_u = src.get_delay(serv.input_size)
+
                 t_c = serv.workload / dst.server.max_cap
                 t_r = self.infr.get_path_delay(src, dst, serv)
                 rem_delay_budget = serv.max_delay - t_u - t_c

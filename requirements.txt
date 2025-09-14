@@ -8,3 +8,4 @@ simpy==4.1.1
 sumolib==1.24.0
 tqdm==4.67.1
 pyproj==3.7.2
+multipledispatch==1.0.0

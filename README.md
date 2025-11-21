@@ -35,7 +35,6 @@ The orchestrator controls three core objects:
 
 By changing these three, you implement different orchestration / energy-saving strategies. MintEDGE gives you a controlled environment to test them.
 
-
 <br>
 
 ## Installation
@@ -366,11 +365,40 @@ To add a new service, you would:
 
 ## Writing your own resource allocation strategy
 
+MintEDGE is designed so that the **resource allocation strategy is a pluggable module**.
+
+By default, the strategy is implemented in `mintedge/allocation_strategy.py`. This is the file you customize
+
+At each orchestration step (every `ORCHESTRATOR_INTERVAL` seconds, or earlier if reactive allocation is enabled), the orchestrator:
+
+1. Collects telemetry (load, rejected requests, delays, utilizations, energy, …).
+2. Calls the strategy in `mintedge/allocation_strategy.py`.
+3. Receives three outputs:
+   - **status vector**: which servers are on/off and where they are deployed,
+   - **assignation matrix**: where each BS’s requests are processed,
+   - **allocation matrix**: share of CPU capacity each service receives on each server.
+
+By changing how these three objects are computed in `allocation_strategy.py`, you define a new resource allocation / energy-saving strategy.
+
+Inside you will find the default strategy implementation. This file contains the function (or class) that the orchestrator calls every `ORCHESTRATOR_INTERVAL`. Read the docstring and comments in this file first; they describe exactly what inputs you receive and what you must return.
+
+
 <br>
 
 ## How to contribute
 
-<br>
+Contributions are welcome.
+
+- Keep pull requests **small and focused** (one feature or bug fix per PR).
+- Make sure a **basic run** still works (native or Docker), e.g. a short simulation with default settings.
+- If you change behaviour, **update documentation** (`README.md`, `settings.py` comments, etc.) accordingly.
+- Prefer **clear names, docstrings, and comments** over clever but hard-to-read code.
+- In the PR description, briefly state:
+  - what you changed,
+  - why you changed it,
+  - how you verified it (commands / scenarios).
+
+That’s it. Standard GitHub fork/branch/PR workflow applies.
 
 ## References
 

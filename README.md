@@ -41,6 +41,44 @@ There are two main ways to run MintEDGE:
 
 ### 1. Native installation in Linux
 
+#### Quick Installation
+
+#### One-Line Install
+You can install MintEDGE and its dependencies in one line on Ubuntu/Debian based systems:
+
+```bash 
+curl -fsSL https://raw.githubusercontent.com/blasf1/MintEDGE/main/install.sh
+``` 
+Or with wget:
+```bash
+wget -qO- https://raw.githubusercontent.com/blasf1/MintEDGE/main/install.sh
+```
+### Manual Installation
+
+If you prefer to review the script first:
+Download the script
+```bash
+wget https://raw.githubusercontent.com/blasf1/MintEDGE/main/install.sh
+```
+Make it executable
+```bash
+chmod +x install.sh
+```
+Run it
+```bash
+./install.sh
+```
+
+The interactive installer will:
+- ✅ Verify system requirements (Python 3.10+, Git, SUMO)
+- ✅ Set up Python virtual environment
+- ✅ Install all dependencies
+- ✅ Run verification tests
+- ✅ Optionally run a test simulation
+
+For other installation methods, see the sections below.
+
+
 #### 1.1 Clone the repository:
 
 ```bash

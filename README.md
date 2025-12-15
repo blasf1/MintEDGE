@@ -117,6 +117,8 @@ docker run --rm -v "$PWD:/app" mintedge \
 After the run, you should see `results.csv` (or whatever name you chose) appear in your MintEDGE folder on the host.
 You can adjust the simulation time, the seed and the output file in the command line. This facilitates launching multiple simulations simultaneously in distributed environments, e.g. a cluster with SLURM scheduler. More advanced settings about your scenario can be adjusted in the `settings.py` file
 
+### Cache
+When generating a SUMO network file this is stored in the `maps` folder within the current working directory. The OSM file used for the generation is also cached in this directory. To clear the cache you can just delete this folder.
 
 ## Project Structure
 

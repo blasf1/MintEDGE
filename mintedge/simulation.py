@@ -191,83 +191,99 @@ class Simulation:
         if which("netconvert") is None:
             raise MintEDGEError("netconvert is not installed")
 
-        # temp workspace (deleted on interpreter exit)
-        tmp = tempfile.mkdtemp()
-        atexit.register(lambda: shutil.rmtree(tmp, ignore_errors=True))
-        osm_xml = os.path.join(tmp, "bbox.osm.xml")
-        net_xml = os.path.join(tmp, "map.net.xml")
+        # Create map directory in working dir if it does not exist
+        work_dir = os.path.abspath(os.getcwd())
+        map_dir = os.path.join(work_dir, 'maps')
+        if (not os.path.exists(map_dir)):
+            os.mkdir(map_dir)
 
-        # Overpass QL: fetch all nodes/ways/relations in bbox + their referenced nodes
-        query = f"""
-        [out:xml][timeout:180];
-        (
-        node({south},{west},{north},{east});
-        way({south},{west},{north},{east});
-        );
-        (._;>;);      // include all referenced nodes
-        out body;
-        """
-        #        relation({south},{west},{north},{east});
+        # Create directory for current location if it does not exists
+        location_prefix = f"{north}x{west}-{south}x{east}"
+        location_dir = os.path.join(map_dir, location_prefix)
+        if (not os.path.exists(location_dir)):
+            os.mkdir(location_dir)
 
-        headers = {
-            # Identify your app politely; replace with your project/email if you have one.
-            "User-Agent": "MintEDGE (contact: hello@blasgomez.eu) Python",
-        }
+        # Filenames for map and net file
+        osm_xml = os.path.join(location_dir, "bbox.osm.xml")
+        net_xml = os.path.join(location_dir, "map.net.xml")
 
-        last_err = None
-        for url in settings.API_MIRRORS:
-            try:
-                print(f"Downloading map from Overpass: {url}")
-                resp = requests.post(
-                    url, data={"data": query}, headers=headers, timeout=(15, 300)
-                )
-                # Retry on busy/limited servers
-                if resp.status_code in {429, 504, 502, 503}:
-                    last_err = MintEDGEError(
-                        f"Overpass mirror busy ({resp.status_code})"
+        new_download = False
+        if (not os.path.exists(osm_xml) or not os.path.exists(net_xml)):
+            # Track if osm data is new
+            new_download = True
+
+            # Overpass QL: fetch all nodes/ways/relations in bbox + their referenced nodes
+            query = f"""
+            [out:xml][timeout:180];
+            (
+            node({south},{west},{north},{east});
+            way({south},{west},{north},{east});
+            );
+            (._;>;);      // include all referenced nodes
+            out body;
+            """
+            #        relation({south},{west},{north},{east});
+
+            headers = {
+                # Identify your app politely; replace with your project/email if you have one.
+                "User-Agent": "MintEDGE (contact: hello@blasgomez.eu) Python",
+            }
+
+            last_err = None
+            for url in settings.API_MIRRORS:
+                try:
+                    print(f"Downloading map from Overpass: {url}")
+                    resp = requests.post(
+                        url, data={"data": query}, headers=headers, timeout=(15, 300)
                     )
+                    # Retry on busy/limited servers
+                    if resp.status_code in {429, 504, 502, 503}:
+                        last_err = MintEDGEError(
+                            f"Overpass mirror busy ({resp.status_code})"
+                        )
+                        continue
+                    resp.raise_for_status()
+                    # Overpass returns HTML when a query fails; make sure it’s XML
+                    if b"<osm" not in resp.content[:2000].lower():
+                        raise MintEDGEError(
+                            "Overpass returned non-OSM content (query failed)."
+                        )
+                    with open(osm_xml, "wb") as f:
+                        f.write(resp.content)
+                    break
+                except Exception as e:
+                    last_err = e
                     continue
-                resp.raise_for_status()
-                # Overpass returns HTML when a query fails; make sure it’s XML
-                if b"<osm" not in resp.content[:2000].lower():
-                    raise MintEDGEError(
-                        "Overpass returned non-OSM content (query failed)."
-                    )
-                with open(osm_xml, "wb") as f:
-                    f.write(resp.content)
-                break
-            except Exception as e:
-                last_err = e
-                continue
-        else:
-            raise MintEDGEError(
-                f"Failed to download OSM data from Overpass mirrors: {last_err}"
-            )
+            else:
+                raise MintEDGEError(
+                    f"Failed to download OSM data from Overpass mirrors: {last_err}"
+                )
 
-        # Convert the OSM file to a SUMO network file
-        cmd = [
-            "netconvert",
-            "--osm-files",
-            osm_xml,
-            "-o",
-            net_xml,
-            "--no-warnings",
-            "--ignore-errors",
-            "--remove-edges.isolated",
-            "--remove-edges.by-type",
-            "railway.rail,railway.tram,railway.light_rail,railway.subway,railway.preserved,highway.pedestrian,highway.cycleway,highway.footway,highway.bridleway,highway.steps,highway.step,highway.stairs",
-            "--ramps.guess",
-            "--junctions.join",
-            "--tls.join",
-            "--no-internal-links",
-            "--no-turnarounds",
-            "--roundabouts.guess",
-            "--offset.disable-normalization",
-            "--output.original-names",
-        ]
-        res = subprocess.run(cmd, capture_output=True, text=True)
-        if res.returncode != 0:
-            raise MintEDGEError(f"netconvert failed:\n{res.stderr}")
+        if (not os.path.exists(net_xml) or new_download):
+            # Convert the OSM file to a SUMO network file if it does not exist or if osm data is just downloaded
+            cmd = [
+                "netconvert",
+                "--osm-files",
+                osm_xml,
+                "-o",
+                net_xml,
+                "--no-warnings",
+                "--ignore-errors",
+                "--remove-edges.isolated",
+                "--remove-edges.by-type",
+                "railway.rail,railway.tram,railway.light_rail,railway.subway,railway.preserved,highway.pedestrian,highway.cycleway,highway.footway,highway.bridleway,highway.steps,highway.step,highway.stairs",
+                "--ramps.guess",
+                "--junctions.join",
+                "--tls.join",
+                "--no-internal-links",
+                "--no-turnarounds",
+                "--roundabouts.guess",
+                "--offset.disable-normalization",
+                "--output.original-names",
+            ]
+            res = subprocess.run(cmd, capture_output=True, text=True)
+            if res.returncode != 0:
+                raise MintEDGEError(f"netconvert failed:\n{res.stderr}")
 
         settings.NET_FILE = net_xml
 

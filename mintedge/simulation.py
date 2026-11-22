@@ -212,13 +212,12 @@ class Simulation:
             # Track if osm data is new
             new_download = True
 
-            # Overpass QL: fetch all nodes/ways/relations in bbox + their referenced nodes
+            # Overpass QL: fetch road ways (highway=*) in bbox + their referenced nodes
             query = f"""
             [out:xml][timeout:180];
             (
-            node({south},{west},{north},{east});
-            way({south},{west},{north},{east});
-            );
+            way["highway"]({south},{west},{north},{east});
+            );  // roads only: much lighter than all nodes/ways, enough for SUMO
             (._;>;);      // include all referenced nodes
             out body;
             """
